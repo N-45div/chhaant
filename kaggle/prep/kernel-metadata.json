@@ -1,0 +1,20 @@
+{
+  "id": "divijio/chhaant-data-prep",
+  "title": "chhaant-data-prep",
+  "code_file": "prep.py",
+  "language": "python",
+  "kernel_type": "script",
+  "is_private": true,
+  "enable_gpu": false,
+  "enable_tpu": false,
+  "enable_internet": true,
+  "dataset_sources": [
+    "sujaykapadnis/tomato-maturity-detection-and-quality-grading",
+    "lucianon/banana-ripeness-dataset",
+    "arnaudfadja/african-plums-quality-and-defect-assessment-data",
+    "josembm/industrial-fruit-defect-detection-conveyor-belt",
+    "kalai1203/mango-quality-grading-dataset"
+  ],
+  "competition_sources": [],
+  "kernel_sources": []
+}
