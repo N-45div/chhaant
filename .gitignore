@@ -1,0 +1,13 @@
+.venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+
+# Data and model weights are fetched, never committed
+data/
+models/*.onnx
+kaggle/**/output/
+
+# Secrets
+.env
+*.pem
