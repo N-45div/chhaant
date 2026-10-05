@@ -7,7 +7,7 @@
 2. Catalogue every dataset attached to this kernel, so the training code is
    written against the real folder layout.
 
-Outputs (in /kaggle/working): tr6_512/, tr6_manifest.csv, tr6_methane.csv,
+Outputs (in /kaggle/working): tr6_512.zip, tr6_manifest.csv, tr6_methane.csv,
 inventory.txt
 """
 
@@ -16,6 +16,7 @@ import csv
 import json
 import os
 import re
+import shutil
 import struct
 import time
 import urllib.request
@@ -200,7 +201,14 @@ def build_tr6():
     print("views per session, by fruit:", sorted(summary.items()))
 
 
-def inventory(root="/kaggle/input", max_depth=5):
+def pack_images():
+    """Ship the images as one stored zip: a kernel's output downloads file by file."""
+    shutil.make_archive(IMG_DIR, "zip", OUT, "tr6_512")
+    shutil.rmtree(IMG_DIR)
+    print("packed", os.path.getsize(IMG_DIR + ".zip") // 2**20, "MB")
+
+
+def inventory(root="/kaggle/input", max_depth=10):
     lines = []
     for ds in sorted(os.listdir(root)) if os.path.isdir(root) else []:
         base = os.path.join(root, ds)
@@ -229,3 +237,4 @@ def inventory(root="/kaggle/input", max_depth=5):
 if __name__ == "__main__":
     inventory()
     build_tr6()
+    pack_images()
