@@ -19,6 +19,7 @@ import re
 import shutil
 import struct
 import time
+import urllib.error
 import urllib.request
 import zlib
 from concurrent.futures import ThreadPoolExecutor, as_completed
@@ -43,15 +44,50 @@ def article_file():
 URL, SIZE = article_file()
 
 
-def fetch(start, end, tries=5):
+def fetch(start, end, tries=8):
+    """One HTTP range read. Backs off on rate limits (figshare answers 429 to bursts)."""
     for attempt in range(tries):
         try:
             req = urllib.request.Request(URL, headers={"Range": f"bytes={start}-{end}", "User-Agent": "chhaant-prep"})
-            return urllib.request.urlopen(req, timeout=120).read()
-        except Exception:
+            return urllib.request.urlopen(req, timeout=300).read()
+        except urllib.error.HTTPError as err:
+            if attempt == tries - 1 or err.code not in (429, 500, 502, 503, 504):
+                raise
+            wait = float(err.headers.get("Retry-After") or 0) or 10 * 2 ** attempt
+            print(f"HTTP {err.code}, waiting {wait:.0f}s", flush=True)
+            time.sleep(wait)
+        except (urllib.error.URLError, TimeoutError, ConnectionError):
             if attempt == tries - 1:
                 raise
-            time.sleep(2 ** attempt)
+            time.sleep(10 * 2 ** attempt)
+
+
+def blocks(entries, max_bytes=96 * 2**20, max_gap=4 * 2**20):
+    """Group entries that sit next to each other in the zip into ~96 MB reads."""
+    entries = sorted(entries, key=lambda e: e["off"])
+    group = [entries[0]]
+    for e in entries[1:]:
+        prev_end = group[-1]["off"] + 30 + 2048 + group[-1]["csize"]
+        if e["off"] - prev_end > max_gap or e["off"] + e["csize"] - group[0]["off"] > max_bytes:
+            yield group
+            group = []
+        group.append(e)
+    yield group
+
+
+def read_block(group):
+    """Fetch a run of neighbouring entries in one request and slice each one out."""
+    start = group[0]["off"]
+    end = min(SIZE - 1, group[-1]["off"] + 30 + 2048 + group[-1]["csize"])
+    blob = fetch(start, end)
+    out = []
+    for e in group:
+        p = e["off"] - start
+        lnl, lel = struct.unpack("<HH", blob[p + 26:p + 30])
+        s = p + 30 + lnl + lel
+        raw = blob[s:s + e["csize"]]
+        out.append((e, zlib.decompress(raw, -15) if e["method"] == 8 else raw))
+    return out
 
 
 def central_directory():
@@ -96,7 +132,7 @@ def shrink(jpeg_bytes):
     h, w = img.shape[:2]
     s = MAX_SIDE / max(h, w)
     img = cv2.resize(img, (round(w * s), round(h * s)), interpolation=cv2.INTER_AREA)
-    ok, enc = cv2.imencode(".jpg", img, [cv2.IMWRITE_JPEG_QUALITY, 92])
+    _, enc = cv2.imencode(".jpg", img, [cv2.IMWRITE_JPEG_QUALITY, 92])
     return enc.tobytes(), (w * 2, h * 2)
 
 
@@ -141,18 +177,18 @@ def build_tr6():
             ir_temps[m.group(1)].append((stamp(m.group(2)), float(m.group(3)), float(m.group(4))))
 
     rows, sizes = [], {}
-    with ThreadPoolExecutor(32) as pool:
-        futs = {pool.submit(read_entry, e): e for e in srgb}
-        for n, fut in enumerate(as_completed(futs), 1):
-            e = futs[fut]
-            fruit, fname = e["name"].split("/")[2], e["name"].split("/")[-1]
-            small, orig = shrink(fut.result())
-            os.makedirs(os.path.join(IMG_DIR, fruit), exist_ok=True)
-            with open(os.path.join(IMG_DIR, fruit, fname), "wb") as fh:
-                fh.write(small)
-            sizes[(fruit, fname)] = orig
-            if n % 250 == 0:
-                print(f"{n}/{len(srgb)} images", flush=True)
+    groups = list(blocks(srgb))
+    print(f"{len(srgb)} photos in {len(groups)} range reads", flush=True)
+    with ThreadPoolExecutor(4) as pool:
+        for n, fut in enumerate(as_completed([pool.submit(read_block, g) for g in groups]), 1):
+            for e, data in fut.result():
+                fruit, fname = e["name"].split("/")[2], e["name"].split("/")[-1]
+                small, orig = shrink(data)
+                os.makedirs(os.path.join(IMG_DIR, fruit), exist_ok=True)
+                with open(os.path.join(IMG_DIR, fruit, fname), "wb") as fh:
+                    fh.write(small)
+                sizes[(fruit, fname)] = orig
+            print(f"block {n}/{len(groups)}, {len(sizes)} photos", flush=True)
 
     by_fruit = collections.defaultdict(list)
     for fruit, fname in sizes:
