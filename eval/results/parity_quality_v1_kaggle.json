@@ -1,0 +1,11 @@
+{
+ "opencv": "5.0.0",
+ "ENGINE_NEW": {
+  "max_abs_diff_defect": 2.562999725341797e-06,
+  "max_abs_diff_ripeness": 1.2099742889404297e-05
+ },
+ "ENGINE_CLASSIC": {
+  "max_abs_diff_defect": 2.1457672119140625e-06,
+  "max_abs_diff_ripeness": 9.834766387939453e-06
+ }
+}
