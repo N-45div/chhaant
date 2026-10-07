@@ -1,0 +1,21 @@
+{
+  "id": "divijio/chhaant-train-quality",
+  "title": "chhaant-train-quality",
+  "code_file": "train.py",
+  "language": "python",
+  "kernel_type": "script",
+  "is_private": true,
+  "enable_gpu": true,
+  "enable_tpu": false,
+  "enable_internet": true,
+  "machine_shape": "NvidiaTeslaT4",
+  "dataset_sources": [
+    "divijio/chhaant-src",
+    "sujaykapadnis/tomato-maturity-detection-and-quality-grading",
+    "lucianon/banana-ripeness-dataset",
+    "arnaudfadja/african-plums-quality-and-defect-assessment-data",
+    "josembm/industrial-fruit-defect-detection-conveyor-belt"
+  ],
+  "competition_sources": [],
+  "kernel_sources": []
+}
