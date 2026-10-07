@@ -13,7 +13,7 @@ import numpy as np
 MODEL_SIDE = 224
 MARGIN = 0.12        # space around the item's bounding box, as a share of its size
 NEUTRAL = (127, 127, 127)
-MASK_DILATE_PX = 3   # keep a hair of rim so the outline is not clipped
+RIM_FRAC = 0.015     # keep a thin rim (share of the item's size) so the outline is not clipped
 
 
 def item_crop(bgr: np.ndarray, mask: np.ndarray | None = None, side: int = MODEL_SIDE) -> np.ndarray:
@@ -27,11 +27,11 @@ def item_crop(bgr: np.ndarray, mask: np.ndarray | None = None, side: int = MODEL
         cx, cy, half = w / 2, h / 2, max(w, h) / 2
         work = bgr
     else:
-        k = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (2 * MASK_DILATE_PX + 1,) * 2)
-        keep = cv2.dilate(mask, k) > 0
+        x, y, bw, bh = cv2.boundingRect(mask)
+        r = max(1, round(RIM_FRAC * max(bw, bh)))  # proportional, so every resolution crops alike
+        keep = cv2.dilate(mask, cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (2 * r + 1,) * 2)) > 0
         work = bgr.copy()
         work[~keep] = NEUTRAL
-        x, y, bw, bh = cv2.boundingRect(mask)
         cx, cy = x + bw / 2, y + bh / 2
         half = max(bw, bh) * (0.5 + MARGIN)
 

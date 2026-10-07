@@ -25,7 +25,7 @@ def test_backdrop_is_greyed_out():
     crop = item_crop(img, mask)
     assert tuple(int(v) for v in crop[2, 2]) == NEUTRAL
     backdrop_left = np.all(crop == (230, 228, 225), axis=-1).mean()
-    assert backdrop_left < 0.02  # only the thin rim kept around the outline
+    assert backdrop_left < 0.03  # only the thin proportional rim kept around the outline
 
 
 def test_item_fills_most_of_the_crop():
