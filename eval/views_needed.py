@@ -14,8 +14,13 @@ model and the ROC AUC of the session score against the dataset's spoiled label,
 per produce type and pooled. TR-6 follows one fruit per type, so sessions of a
 type are not independent; read per-type numbers as trajectories of one fruit.
 
+Scorers: ``classical`` is the explainable defect map; ``model`` is the learned
+quality model run through OpenCV 5's DNN engine. The model never saw TR-6 in
+training, so its numbers measure transfer to an unseen camera and scene.
+
 Usage:
-    python eval/views_needed.py --data data/tr6
+    python eval/views_needed.py --data data/tr6 --scorer classical
+    python eval/views_needed.py --data data/tr6 --scorer model --model models/chhaant_quality_v1.onnx
 """
 
 import argparse
@@ -31,6 +36,7 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 from chhaant.data.tr6 import load_sessions  # noqa: E402
 from chhaant.vision.color import white_balance_from_background  # noqa: E402
 from chhaant.vision.defects import defect_map, summarise  # noqa: E402
+from chhaant.vision.model import QualityModel  # noqa: E402
 from chhaant.vision.segment import segment_fruit  # noqa: E402
 from chhaant.vision.views import CoverageMap  # noqa: E402
 
@@ -38,13 +44,29 @@ SIDE_ELEVATION = 40.0
 DRAWS = 30
 
 
+_MODEL = None
+
+
+def _init_model(path: str) -> None:
+    global _MODEL
+    _MODEL = QualityModel(path, "new")
+
+
 def score_photo(path: str) -> float:
+    """Classical score: share of the item flagged by the defect map."""
     img = cv2.imread(path)
     seg = segment_fruit(img)
     if not seg.ok:
         return float("nan")
     balanced = white_balance_from_background(img, seg.mask)
     return summarise(defect_map(balanced, seg.mask), seg.mask).area_frac
+
+
+def score_photo_model(path: str) -> float:
+    """Learned score: the model's defect probability for the item."""
+    img = cv2.imread(path)
+    seg = segment_fruit(img)
+    return _MODEL.predict(img, seg.mask if seg.ok else None).defect
 
 
 def auc(scores: np.ndarray, labels: np.ndarray) -> float:
@@ -74,13 +96,22 @@ def coverage(indices: list[int], n: int) -> float:
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--data", default="data/tr6")
-    ap.add_argument("--out", default="eval/results/views_needed.csv")
+    ap.add_argument("--scorer", choices=("classical", "model"), default="classical")
+    ap.add_argument("--model", default="models/chhaant_quality_v1.onnx")
+    ap.add_argument("--out", default=None)
     args = ap.parse_args()
+    args.out = args.out or f"eval/results/views_needed_{args.scorer}.csv"
 
     sessions = [s for s in load_sessions(args.data) if len(s.side_views) == 16]
     paths = [os.path.join(args.data, f) for s in sessions for f in s.side_views]
-    with ProcessPoolExecutor() as pool:
-        flat = list(pool.map(score_photo, paths, chunksize=32))
+    if args.scorer == "model":
+        # One process: OpenCV's DNN threads itself, and spawning several model
+        # copies on Windows crashed workers outright. ~8 ms per photo anyway.
+        _init_model(args.model)
+        flat = [score_photo_model(p) for p in paths]
+    else:
+        with ProcessPoolExecutor() as pool:
+            flat = list(pool.map(score_photo, paths, chunksize=32))
     per_view = np.array(flat, np.float32).reshape(len(sessions), 16)
     per_view = np.nan_to_num(per_view, nan=0.0)
     labels = np.array([s.spoiled for s in sessions])
