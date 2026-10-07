@@ -4,7 +4,7 @@ __pycache__/
 .pytest_cache/
 
 # Data and model weights are fetched, never committed
-data/
+/data/
 models/*.onnx
 kaggle/**/output/
 
