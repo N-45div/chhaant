@@ -12,3 +12,6 @@ kaggle/**/output/
 # Secrets
 .env
 *.pem
+
+# Third-party robot models are fetched by scripts/fetch_so101.py
+/assets/
