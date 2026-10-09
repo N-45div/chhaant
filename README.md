@@ -32,3 +32,20 @@ pytest
 
 On AWS Graviton the same code runs on the Cloud-Optimized OpenCV Library (COOL)
 build that ships with the COOL AMI, instead of the PyPI wheel.
+
+## Licence
+
+Apache License 2.0 (see [LICENSE](LICENSE)).
+
+## Data and model credits
+
+Nothing below is redistributed in this repository; scripts fetch it from the source.
+
+| What | Source | Licence |
+|---|---|---|
+| TriModal Ripeness 6 (16-angle daily photos to spoilage) | figshare, doi:10.6084/m9.figshare.30783827 | CC BY 4.0 |
+| Tomato maturity and quality grading | Kaggle `sujaykapadnis/tomato-maturity-detection-and-quality-grading` (Sher-e-Bangla Agricultural University) | CC BY 4.0 |
+| Banana ripeness (CEAGESP stages) | Kaggle `lucianon/banana-ripeness-dataset` | CC BY 4.0 |
+| African plums quality and defects | Kaggle `arnaudfadja/african-plums-quality-and-defect-assessment-data` | CC BY-SA 4.0 |
+| Fruit defects on a conveyor belt | Kaggle `josembm/industrial-fruit-defect-detection-conveyor-belt` | CC0 1.0 |
+| SO-101 arm model | MuJoCo Menagerie `robotstudio_so101` | Apache 2.0 |
