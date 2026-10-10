@@ -1,0 +1,7 @@
+forecaster,mae_days,mae_T10,mae_T20,mae_Tam,within_1_day,coverage,q10_mean,q10_sd
+constant,3.522,4.604,1.92,1.896,0.181,,,
+temp_only,3.452,4.578,1.79,1.754,0.335,,,
+vision_blind,1.584,1.849,1.133,1.242,0.572,,,
+vision_temp,1.048,1.392,0.56,0.51,0.641,,,
+one_side,1.061,1.413,0.566,0.505,0.642,,,
+vision_temp_interval80,,,,,,0.814,2.66,0.049
