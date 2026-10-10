@@ -1,0 +1,5 @@
+fruit,sessions_before_spoiling,spearman_ripeness_vs_hours_left,spearman_defect_vs_hours_left,ripeness_first,ripeness_last
+Banana,9,-0.983,-0.967,0.527,0.805
+Carrot,6,0.543,-0.714,0.878,0.821
+Guava,12,-0.776,0.559,0.0,0.008
+Mango,15,-0.829,0.05,0.007,0.914
