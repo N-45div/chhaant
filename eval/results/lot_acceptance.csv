@@ -1,0 +1,15 @@
+inspector,true_rate,p_accept_sequential,p_accept_fixed,items_sequential,items_fixed,person_checks_sequential,person_checks_fixed
+perfect inspector,0.0,1.0,1.0,18.0,50,18.0,50.0
+perfect inspector,0.02,1.0,1.0,21.537,50,21.537,50.0
+perfect inspector,0.05,0.97,0.975,28.613,50,28.613,50.0
+perfect inspector,0.1,0.613,0.617,34.241,50,34.241,50.0
+perfect inspector,0.15,0.208,0.19,28.113,50,28.113,50.0
+perfect inspector,0.2,0.051,0.034,20.804,50,20.804,50.0
+perfect inspector,0.3,0.003,0.0,11.739,50,11.739,50.0
+Chhaant (measured),0.0,1.0,1.0,37.772,135,4.003,14.568
+Chhaant (measured),0.02,0.999,0.995,45.733,135,5.015,14.957
+Chhaant (measured),0.05,0.97,0.965,61.816,135,7.149,15.723
+Chhaant (measured),0.1,0.664,0.689,79.183,135,9.877,16.907
+Chhaant (measured),0.15,0.227,0.228,69.389,135,9.302,18.074
+Chhaant (measured),0.2,0.044,0.037,48.947,135,6.981,19.471
+Chhaant (measured),0.3,0.002,0.0,25.907,135,4.204,21.983
