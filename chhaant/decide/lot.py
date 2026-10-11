@@ -11,10 +11,21 @@ with at most ``alpha`` chance of rejecting a good crate and ``beta`` of
 accepting a bad one. A cap on items stops the open-ended run that ISO 28591
 warns about; at the cap the evidence decides by which bound it is nearer.
 
-The robot is not a perfect inspector, so its calls carry its measured error
-rates: it calls a defect with probability q = p*se + (1-p)*(1-sp) when the
-true rate is p. Items it cannot decide go to a person, whose verdict counts as
-the truth.
+The robot is not a perfect inspector. Each inspected item ends in one of four
+outcomes, whose probabilities under a true defect rate p use the robot's
+measured rates (sensitivity se, specificity sp, and hand-off rates e_d for
+defective and e_c for clean items; a person's verdict counts as the truth):
+
+    person says defective   p * e_d
+    person says clean       (1 - p) * e_c
+    robot says defective    p * (1 - e_d) * se + (1 - p) * (1 - e_c) * (1 - sp)
+    robot says clean        p * (1 - e_d) * (1 - se) + (1 - p) * (1 - e_c) * sp
+
+Hand-offs change what the robot's own calls mean. It hands defective items to
+a person more often than clean ones, so the items it keeps are skewed clean.
+A test that read the robot's calls as if nothing were ever handed off broke
+its promise (a good crate accepted 88% of the time instead of 95% in
+simulation). For a person's verdict the hand-off rates cancel out.
 """
 
 import math
@@ -23,12 +34,24 @@ from dataclasses import dataclass, field
 
 @dataclass(frozen=True)
 class Inspector:
-    sensitivity: float = 1.0   # P(robot calls "defective" | item is defective), among items it decides
-    specificity: float = 1.0   # P(robot calls "clean" | item is clean), among items it decides
+    sensitivity: float = 1.0         # P(robot calls "defective" | defective item it decides)
+    specificity: float = 1.0         # P(robot calls "clean" | clean item it decides)
+    escalate_defective: float = 0.0  # P(handed to a person | defective item)
+    escalate_clean: float = 0.0      # P(handed to a person | clean item)
+
+    def outcome_prob(self, p: float, defective: bool, by_person: bool) -> float:
+        """Probability of one item's outcome when the crate's true defect rate is p."""
+        if by_person:
+            return p * self.escalate_defective if defective else (1 - p) * self.escalate_clean
+        robot_bad = p * (1 - self.escalate_defective)
+        robot_good = (1 - p) * (1 - self.escalate_clean)
+        if defective:
+            return robot_bad * self.sensitivity + robot_good * (1 - self.specificity)
+        return robot_bad * (1 - self.sensitivity) + robot_good * self.specificity
 
     def call_rate(self, p: float) -> float:
-        """Share of decided items the robot calls defective when the true defect rate is p."""
-        return p * self.sensitivity + (1.0 - p) * (1.0 - self.specificity)
+        """Share of all inspected items called defective (by the robot or a person)."""
+        return self.outcome_prob(p, True, False) + self.outcome_prob(p, True, True)
 
 
 PERFECT = Inspector()
@@ -59,8 +82,10 @@ class LotPlan:
 
     def step(self, defective: bool, by_person: bool) -> float:
         """Log-likelihood-ratio increment for one inspected item."""
-        lo, hi = (self.p0, self.p1) if by_person else (self.inspector.call_rate(self.p0), self.inspector.call_rate(self.p1))
-        return math.log(hi / lo) if defective else math.log((1 - hi) / (1 - lo))
+        if by_person:  # a person's verdict is the truth; hand-off rates cancel in the ratio
+            return math.log(self.p1 / self.p0) if defective else math.log((1 - self.p1) / (1 - self.p0))
+        insp = self.inspector
+        return math.log(insp.outcome_prob(self.p1, defective, False) / insp.outcome_prob(self.p0, defective, False))
 
 
 @dataclass

@@ -64,3 +64,16 @@ def test_no_items_after_the_decision():
         lot.add(False, True)
     with pytest.raises(RuntimeError):
         lot.add(False, True)
+
+
+def test_hand_offs_alone_carry_no_bias_when_the_robot_is_perfect():
+    plan = LotPlan(inspector=Inspector(escalate_defective=0.3, escalate_clean=0.1))
+    # a perfect robot on the items it keeps: its verdicts are as informative as a person's
+    assert plan.step(True, False) == pytest.approx(plan.step(True, True))
+    assert plan.step(False, False) == pytest.approx(math.log((0.8 * 0.9) / (0.95 * 0.9)))
+
+
+def test_robot_outcomes_account_for_what_was_handed_off():
+    insp = Inspector(sensitivity=0.67, specificity=0.92, escalate_defective=0.29, escalate_clean=0.11)
+    total = sum(insp.outcome_prob(0.1, d, h) for d in (True, False) for h in (True, False))
+    assert total == pytest.approx(1.0)
