@@ -1,0 +1,77 @@
+"""Questions the robot puts to a person, and their answers.
+
+The agent may ask a person instead of guessing (an undecided inspection, a
+shelf life that straddles the eat-by day). A request stays pending until
+someone answers it. Some moves (packing an undecided item, discarding a sound
+one) are refused until a person has approved them.
+
+``SimulatedReviewer`` answers from the dataset's own labels so whole runs can
+be scored without a human in the loop; anything it answers is marked
+``by="simulated reviewer"`` so it is never mistaken for a real person.
+"""
+
+import itertools
+from dataclasses import dataclass, field
+from datetime import datetime, timezone
+
+
+@dataclass
+class Request:
+    id: str
+    item_id: str
+    kind: str                 # "pack", "reject" or "question"
+    question: str
+    evidence: dict
+    status: str = "pending"   # "pending", "approved", "declined"
+    answer: str = ""
+    by: str = ""
+    asked_at: str = field(default_factory=lambda: datetime.now(timezone.utc).isoformat(timespec="seconds"))
+    answered_at: str = ""
+
+
+class ApprovalQueue:
+    def __init__(self):
+        self.requests: list[Request] = []
+        self._ids = itertools.count(1)
+
+    def ask(self, item_id: str, kind: str, question: str, evidence: dict) -> Request:
+        if kind not in ("pack", "reject", "question"):
+            raise ValueError(f"unknown request kind: {kind}")
+        req = Request(f"Q{next(self._ids)}", item_id, kind, question, evidence)
+        self.requests.append(req)
+        return req
+
+    def answer(self, request_id: str, approved: bool, answer: str, by: str) -> Request:
+        req = self.get(request_id)
+        if req.status != "pending":
+            raise RuntimeError(f"{request_id} was already answered")
+        req.status = "approved" if approved else "declined"
+        req.answer, req.by = answer, by
+        req.answered_at = datetime.now(timezone.utc).isoformat(timespec="seconds")
+        return req
+
+    def get(self, request_id: str) -> Request:
+        for r in self.requests:
+            if r.id == request_id:
+                return r
+        raise KeyError(request_id)
+
+    def approved(self, item_id: str, kind: str) -> bool:
+        return any(r.item_id == item_id and r.kind == kind and r.status == "approved" for r in self.requests)
+
+    @property
+    def pending(self) -> list[Request]:
+        return [r for r in self.requests if r.status == "pending"]
+
+
+class SimulatedReviewer:
+    """Answers from ground truth, for scoring runs offline. Never presented as a person."""
+
+    name = "simulated reviewer"
+
+    def review(self, req: Request, truth_ok_to_pack: bool) -> tuple[bool, str]:
+        if req.kind == "pack":
+            return truth_ok_to_pack, "fine to pack" if truth_ok_to_pack else "do not pack this one"
+        if req.kind == "reject":
+            return not truth_ok_to_pack, "discard it" if not truth_ok_to_pack else "keep it, it is fine"
+        return True, "fine to pack" if truth_ok_to_pack else "not fit for this order"
