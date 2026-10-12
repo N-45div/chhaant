@@ -42,3 +42,13 @@ def test_quality_only_line_packs_sound_items_without_a_forecast():
 
 def test_quality_only_line_still_sells_an_over_ripe_item_today():
     assert route("clean", Forecast(0.3, 0.1, 0.7), None).action == "sell_today"
+
+
+def test_rock_hard_avocado_is_not_packed_for_tonight():
+    r = route("clean", Forecast(5.8, 4.0, 8.6), 0.5, ripe_window_days=3.0)
+    assert r.action == "skip" and "too firm" in r.reason
+    assert route("clean", Forecast(5.8, 4.0, 8.6), 3, ripe_window_days=3.0).action == "pack"
+
+
+def test_ripe_now_avocado_is_packed_for_tonight():
+    assert route("clean", Forecast(1.5, 0.8, 2.4), 0.5, ripe_window_days=3.0).action == "pack"
