@@ -62,6 +62,16 @@ class ForecastModel:
         r = np.array([rate(t, self.q10) for t in np.atleast_1d(temps_c)])
         return self.days_at_20(X) / r
 
+    def to_dict(self) -> dict:
+        return {"weights": self.weights.tolist(), "bias": self.bias, "mean": self.mean.tolist(),
+                "std": self.std.tolist(), "q10": self.q10, "resid_lo": self.resid_lo,
+                "resid_hi": self.resid_hi, "meta": self.meta}
+
+    @classmethod
+    def from_dict(cls, d: dict) -> "ForecastModel":
+        return cls(np.array(d["weights"]), float(d["bias"]), np.array(d["mean"]), np.array(d["std"]),
+                   float(d["q10"]), float(d["resid_lo"]), float(d["resid_hi"]), dict(d.get("meta", {})))
+
     def predict(self, x: np.ndarray, temp_c: float) -> Forecast:
         d20 = float(self.days_at_20(x)[0])
         r = rate(temp_c, self.q10)

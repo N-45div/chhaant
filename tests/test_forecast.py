@@ -57,3 +57,14 @@ def test_feature_vector_encodes_hue_as_an_angle():
     stats = dict(L=50, a=10, b=20, hue_deg=90, chroma=22, dark_frac=0.0, p_ripeness=0.5, p_defect=0.1)
     v = feature_vector(stats)
     assert v[3] == pytest.approx(1.0) and abs(v[4]) < 1e-9
+
+
+def test_model_round_trips_through_a_dict():
+    X, days, temps = synthetic()
+    model = fit(X, days, temps)
+    calibrate_interval(model, X[:100], days[:100], temps[:100])
+    from chhaant.decide.forecast import ForecastModel
+
+    again = ForecastModel.from_dict(model.to_dict())
+    a, b = model.predict(X[:1], 25.0), again.predict(X[:1], 25.0)
+    assert (a.days, a.low, a.high) == pytest.approx((b.days, b.low, b.high))
