@@ -33,3 +33,12 @@ def test_borderline_shelf_life_goes_to_a_person():
 
 def test_no_forecast_means_no_automatic_packing():
     assert route("clean", None, 1).action == "ask"
+
+
+def test_quality_only_line_packs_sound_items_without_a_forecast():
+    assert route("clean", None, None).action == "pack"
+    assert route("defective", None, None).action == "reject"
+
+
+def test_quality_only_line_still_sells_an_over_ripe_item_today():
+    assert route("clean", Forecast(0.3, 0.1, 0.7), None).action == "sell_today"
