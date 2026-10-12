@@ -8,7 +8,9 @@ model cannot talk its way past them:
 * packing needs the routing to say "pack" for that order line, or a person's approval;
 * discarding a sound item needs a person's approval (no silent food waste);
 * "sell today" needs the forecast to say so, or a person;
-* putting an item back in the crate is always allowed.
+* putting an item back in the crate is always allowed;
+* the job cannot finish with a line short while an item that might fill it is
+  uninspected, or routed "ask" and never put to a person.
 
 A refused move comes back to the model as an explained error and is recorded
 in the trace, so the model can adapt instead of crashing the run.
@@ -205,7 +207,27 @@ class Cell:
         self.trace.log("action", item_id=item_id, destination=destination, order_line=order_line, reason=reason)
         return {"ok": True, "item_id": item_id, "now": st.location}
 
+    def _unexplored(self) -> list[str]:
+        """Why a short line is not yet allowed to stay short."""
+        reasons = []
+        asked = {r.item_id for r in self.queue.requests}
+        for ln in self.order:
+            if not ln.open:
+                continue
+            for item_id, item in self.items.items():
+                st = self.state[item_id]
+                if item.produce != ln.produce or st.location != "crate":
+                    continue
+                if st.inspection is None:
+                    reasons.append(f"line {ln.line} is short but {item_id} ({item.produce}) has not been inspected")
+                elif item_id not in asked and any(r["line"] == ln.line and r["action"] == "ask" for r in self._routings(item_id)):
+                    reasons.append(f"line {ln.line} is short but {item_id}'s routing for it is 'ask' and no person was asked")
+        return reasons
+
     def finish(self, summary: str) -> dict:
+        blockers = self._unexplored()
+        if blockers:
+            return self._refuse("finish", "not yet: " + "; ".join(blockers))
         self.finished, self.summary = True, summary
         return {"ok": True, "order": [{"line": ln.line, "produce": ln.produce, "packed": ln.packed,
                                        "short_by": ln.quantity - len(ln.packed)} for ln in self.order],

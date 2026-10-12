@@ -104,8 +104,27 @@ def test_look_closer_only_for_turntable_items(cell):
     assert not cell.look_closer("A1", 90)["ok"]
 
 
-def test_finish_reports_what_is_still_short(cell):
-    cell.inspect("T1")
+def test_finish_reports_each_line_once_everything_is_explored(cell):
+    for item_id in ("T1", "T2", "T3", "A1", "A2"):
+        cell.inspect(item_id)
     cell.place("T1", "order", 1)
+    cell.place("A1", "order", 2)
     out = cell.finish("done")
-    assert out["order"][1]["short_by"] == 1 and cell.finished
+    assert out["ok"] and cell.finished
+    assert [ln["short_by"] for ln in out["order"]] == [0, 0]
+
+
+def test_cannot_finish_short_while_a_candidate_is_untried(cell):
+    r = cell.finish("done")
+    assert not r["ok"] and "not been inspected" in r["error"] and not cell.finished
+
+
+def test_cannot_finish_short_without_asking_about_an_ask_item():
+    items = [CrateItem("A1", "Avocado", "avocado", 20.0, truth={"defective": False, "days_left": 2.0})]
+    c = Cell(items, FakeInspectors({"A1": inspection("clean", Forecast(0.6, 0.2, 1.3))}))
+    c.read_order([{"produce": "Avocado", "quantity": 1, "eat_in_days": 0.5}])
+    c.inspect("A1")
+    r = c.finish("short, nothing suitable")
+    assert not r["ok"] and "no person was asked" in r["error"]
+    c.ask_person("A1", "pack", "Pack for tonight?")
+    assert c.finish("short; asked about A1, waiting")["ok"]
