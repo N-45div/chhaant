@@ -34,10 +34,9 @@ import numpy as np
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 from chhaant.data.avocado import load_photos  # noqa: E402
-from chhaant.decide.forecast import FEATURES, calibrate_interval, feature_vector, fit  # noqa: E402
-from chhaant.vision.color import colour_stats, white_balance_from_background  # noqa: E402
+from chhaant.decide.forecast import calibrate_interval, feature_vector, fit  # noqa: E402
+from chhaant.decide.shelf import ShelfLife, measure  # noqa: E402
 from chhaant.vision.model import QualityModel  # noqa: E402
-from chhaant.vision.segment import segment_fruit  # noqa: E402
 
 TEMP_C = {"T10": 10.0, "T20": 20.0, "Tam": 20.0}
 FOLDS = 5
@@ -45,16 +44,7 @@ FOLDS = 5
 
 def photo_features(path: str, model: QualityModel) -> dict | None:
     img = cv2.imread(path)
-    if img is None:
-        return None
-    seg = segment_fruit(img)
-    if not seg.ok:
-        return None
-    balanced = white_balance_from_background(img, seg.mask)
-    st = colour_stats(balanced, seg.mask)
-    reading = model.predict(img, seg.mask)
-    return dict(L=st.L, a=st.a, b=st.b, hue_deg=st.hue_deg, chroma=st.chroma, dark_frac=st.dark_frac,
-                p_ripeness=reading.ripeness, p_defect=reading.defect)
+    return None if img is None else measure(img, model)
 
 
 def load_or_build_features(data: str, model_path: str, cache: str) -> dict[str, dict]:
@@ -134,6 +124,25 @@ def evaluate(rows, fold_of):
     return y, groups, preds, lo, hi, q10s
 
 
+def final_forecaster(rows, fold_of) -> ShelfLife:
+    """Fit on every fruit; set the interval from out-of-fold residuals so it stays honest."""
+    X = np.array([r[2] for r in rows])
+    y = np.array([r[3] for r in rows])
+    temps = np.array([TEMP_C[r[1]] for r in rows])
+    fold = np.array([fold_of[r[0]] for r in rows])
+    resid = np.zeros(len(y))
+    for k in range(FOLDS):
+        m = fit(X[fold != k], y[fold != k], temps[fold != k])
+        te = fold == k
+        resid[te] = np.log1p(y[te] * (m.q10 ** ((temps[te] - 20.0) / 10.0))) - np.log1p(m.days_at_20(X[te]))
+    model = fit(X, y, temps)
+    model.resid_lo, model.resid_hi = (float(q) for q in np.quantile(resid, [0.1, 0.9]))
+    model.meta = {"data": "Hass avocado ripening, Mendeley 3xd9n945v8 (CC BY 4.0)",
+                  "validation": "eval/forecast_avocado.py, 5-fold grouped by fruit",
+                  "interval": "80%, out-of-fold residuals"}
+    return ShelfLife(model, {"Avocado"})
+
+
 def mae(p, y):
     return float(np.mean(np.abs(p - y)))
 
@@ -144,6 +153,7 @@ def main() -> None:
     ap.add_argument("--model", default="models/chhaant_quality_v1.onnx")
     ap.add_argument("--cache", default="data/avocado_features.csv")
     ap.add_argument("--out", default="eval/results/forecast_avocado.csv")
+    ap.add_argument("--model-out", default="models/shelf_avocado.json")
     args = ap.parse_args()
 
     photos = load_photos(args.data)
@@ -172,6 +182,11 @@ def main() -> None:
     print(f"80% interval coverage on held-out fruit: {coverage:.2f}; fitted q10 {np.mean(q10s):.2f} +/- {np.std(q10s):.2f}")
     out.append({"forecaster": "vision_temp_interval80", "coverage": round(coverage, 3),
                 "q10_mean": round(float(np.mean(q10s)), 3), "q10_sd": round(float(np.std(q10s)), 3)})
+
+    shelf = final_forecaster(both, fold_of)
+    os.makedirs(os.path.dirname(args.model_out), exist_ok=True)
+    shelf.save(args.model_out)
+    print(f"saved {args.model_out} (q10 {shelf.model.q10:.2f})")
 
     os.makedirs(os.path.dirname(args.out), exist_ok=True)
     fields = list(dict.fromkeys(k for r in out for k in r))
