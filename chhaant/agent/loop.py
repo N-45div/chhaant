@@ -14,11 +14,12 @@ How to work:
 3. Follow each item's routing_for_open_lines. "pack" means place it into that order line. "skip" means it does not
    suit that line; leave it in the crate. "sell_today" means move it to sell_today. "reject" means the reject bin.
 4. When the verdict is "escalate" or a routing says "ask", do not guess: either look_closer at the angles that worry
-   you, or ask_person. Only pack or discard such an item after a person approves.
+   you, or ask_person. Only pack or discard such an item after a person approves. Never leave an order line short
+   while an item whose routing for that line is "ask" has not been put to a person.
 5. The cell enforces its rules. If a move is refused, read the reason and choose another action.
 6. Each tool's capability field says what was measured and what was not. Never claim more than it says.
 7. Call finish with a short, concrete summary: what went where and why (cite verdicts, scores, forecasts), which
-   lines are short, and anything waiting for a person."""
+   lines are short, and anything waiting for a person. Never call the order complete while any line is short."""
 
 
 def _tool_result(call_id: str, output: dict) -> dict:
