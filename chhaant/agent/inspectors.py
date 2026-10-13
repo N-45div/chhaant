@@ -54,10 +54,10 @@ class CellInspectors:
             "capability": "shelf-life forecast (validated: 1.05-day error on 426 held-out avocados); defect inspection not validated for avocado",
             "verdict": "clean" if forecast is not None else "escalate",
             "forecast": forecast, "side_views": len(usable), "coverage": None, "unseen_share": None,
-            "ripeness": round(sum(p["p_ripeness"] for p in usable) / len(usable), 3) if usable else None,
+            "ripeness": None,
             "reason": "forecast from both sides" if forecast else "photos could not be measured",
-            "looks": [{"photo": f"avocado:{rel}", "ripeness": None if p is None else round(p["p_ripeness"], 3)}
-                      for rel, p in zip(item.photos, photos)],
+            # the per-photo model readings feed the forecast but are not shown: they were never validated on avocado
+            "looks": [{"photo": f"avocado:{rel}", "measured": p is not None} for rel, p in zip(item.photos, photos)],
         }
 
     def look(self, item, azimuth: float) -> dict:
