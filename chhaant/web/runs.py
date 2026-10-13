@@ -141,7 +141,7 @@ class RunManager:
             "waiting": [{"request_id": r.id, "item_id": r.item_id, "kind": r.kind, "question": r.question}
                         for r in cell.queue.requests if r.id in waiting],
             "events": events[after:], "next": len(events),
-            "result": run.result,
+            "result": run.result, "sim": getattr(cell, "twin", None) is not None,
         }
 
     def _item_row(self, cell, item_id: str) -> dict:
@@ -167,3 +167,22 @@ class RunManager:
                           "answer": r.answer, "by": r.by} for r in cell.queue.requests if r.item_id == item_id],
             "actions": [e for e in cell.trace.events if e["kind"] in ("action", "guardrail") and e.get("item_id") == item_id],
         }
+
+    # ---- the 3D twin ---------------------------------------------------------
+    def _twin(self, run_id: str):
+        twin = getattr(self.runs[run_id].cell, "twin", None)
+        if twin is None:
+            raise KeyError("no 3D twin for this run")
+        return twin
+
+    def sim_scene(self, run_id: str) -> dict:
+        from chhaant.sim.web_scene import scene_geoms
+
+        twin = self._twin(run_id)
+        m, d = twin.cell.model, twin.cell.data
+        return {"geoms": scene_geoms(m), "moving": twin.moving, "fps": twin.fps,
+                "body_poses": [[round(float(x), 4) for x in list(d.xpos[b]) + list(d.xquat[b])] for b in range(m.nbody)],
+                "items": [{"item_id": n, "body": int(m.body(f"item{i}").id)} for i, n in enumerate(twin.names)]}
+
+    def sim_frames(self, run_id: str, after: int) -> dict:
+        return self._twin(run_id).since(after)
