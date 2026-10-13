@@ -1,0 +1,65 @@
+"""Run the web app:  python -m chhaant.web  (then open http://127.0.0.1:8000)
+
+Settings come from the environment:
+    CHHAANT_TR6, CHHAANT_AVOCADO   data folders (default data/tr6, data/avocado)
+    CHHAANT_MODEL, CHHAANT_SHELF   quality model and avocado forecaster
+    CHHAANT_RUNS                   where run traces are written (default data/runs)
+    CHHAANT_BACKEND                bedrock (default) or nemotron
+    CHHAANT_BEDROCK_MODEL, AWS_REGION
+    NEBIUS_API_KEY, NEBIUS_MODEL   for the Nemotron backend on Nebius Token Factory
+    CHHAANT_RUNS_PER_HOUR, CHHAANT_DAILY_RUNS, HOST, PORT
+"""
+
+import os
+from functools import lru_cache
+
+import uvicorn
+
+from chhaant.agent.cell import Cell
+from chhaant.agent.crate import avocado_items, tr6_items
+from chhaant.agent.inspectors import CellInspectors
+from chhaant.agent.llm import BedrockBackend, OpenAICompatBackend
+from chhaant.decide.shelf import ShelfLife
+from chhaant.vision.model import QualityModel
+from chhaant.web.app import create_app
+from chhaant.web.runs import RunManager
+
+TOKEN_FACTORY = "https://api.tokenfactory.nebius.com/v1"
+TR6_PICKS = [("Tomato", 0), ("Tomato", 1), ("Tomato", 0), ("Mango", 1)]
+AVOCADO_DAYS_LEFT = [6, 2, 1, 0]
+
+
+def build_app():
+    env = os.environ.get
+    tr6, avocado = env("CHHAANT_TR6", "data/tr6"), env("CHHAANT_AVOCADO", "data/avocado")
+    inspectors = CellInspectors(QualityModel(env("CHHAANT_MODEL", "models/chhaant_quality_v1.onnx")), tr6, avocado,
+                                ShelfLife.load(env("CHHAANT_SHELF", "models/shelf_avocado.json")))
+
+    @lru_cache(maxsize=16)
+    def crate(seed: int):
+        return tuple(tr6_items(tr6, TR6_PICKS, seed) + avocado_items(avocado, AVOCADO_DAYS_LEFT, seed))
+
+    def make_cell(trace, reviewer, seed):
+        return Cell(list(crate(seed)), inspectors, trace=trace, reviewer=reviewer)
+
+    backend_kind = env("CHHAANT_BACKEND", "bedrock")
+    if backend_kind == "nemotron":
+        model = env("NEBIUS_MODEL", "nvidia/nemotron-3-super-120b-a12b")
+        label = f"Nemotron on Nebius Token Factory ({model})"
+
+        def make_backend():
+            return OpenAICompatBackend(TOKEN_FACTORY, env("NEBIUS_API_KEY", ""), model)
+    else:
+        model = env("CHHAANT_BEDROCK_MODEL", "global.anthropic.claude-haiku-4-5-20251001-v1:0")
+        label = f"Amazon Bedrock ({model.split('.')[-1].split('-v1')[0]})"
+
+        def make_backend():
+            return BedrockBackend(model, env("AWS_REGION", "ap-south-1"))
+
+    manager = RunManager(make_cell, make_backend, env("CHHAANT_RUNS", "data/runs"),
+                         per_ip_per_hour=int(env("CHHAANT_RUNS_PER_HOUR", "6")), daily_cap=int(env("CHHAANT_DAILY_RUNS", "150")))
+    return create_app(manager, {"tr6": tr6, "avocado": avocado}, lambda seed: list(crate(seed)), label)
+
+
+if __name__ == "__main__":
+    uvicorn.run(build_app(), host=os.environ.get("HOST", "127.0.0.1"), port=int(os.environ.get("PORT", "8000")))
