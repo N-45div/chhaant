@@ -1,0 +1,52 @@
+from types import SimpleNamespace
+
+from chhaant.web.aws import AwsReporter
+
+
+class StubS3:
+    def __init__(self, fail=False):
+        self.uploads, self.fail = [], fail
+
+    def upload_file(self, path, bucket, key):
+        if self.fail:
+            raise RuntimeError("network down")
+        self.uploads.append((bucket, key))
+
+
+class StubCloudWatch:
+    def __init__(self):
+        self.calls = []
+
+    def put_metric_data(self, Namespace, MetricData):
+        self.calls.append((Namespace, MetricData))
+
+
+def run(tmp_path, reviewer="simulated", status="done"):
+    d = tmp_path / "r1"
+    d.mkdir(parents=True, exist_ok=True)
+    (d / "trace.jsonl").write_text("{}\n")
+    (d / "result.json").write_text("{}")
+    result = {"turns": 6, "usage": {"input": 100, "output": 20},
+              "score": {"refused_moves": 2, "person_requests": 1, "inspected": 5, "views": 14, "packed_bad": 1}}
+    return SimpleNamespace(id="r1", reviewer_mode=reviewer, status=status, result=result, started_at=10.0, finished_at=35.5)
+
+
+def test_evidence_goes_to_s3_and_metrics_to_cloudwatch(tmp_path):
+    s3, cw = StubS3(), StubCloudWatch()
+    AwsReporter("bucket", "ap-south-1", s3=s3, cloudwatch=cw)(run(tmp_path), str(tmp_path))
+    assert s3.uploads == [("bucket", "runs/r1/trace.jsonl"), ("bucket", "runs/r1/result.json")]
+    ns, data = cw.calls[0]
+    metrics = {m["MetricName"]: m["Value"] for m in data}
+    assert ns == "Chhaant" and metrics["RunSeconds"] == 25.5 and metrics["RefusedMoves"] == 2 and metrics["PackedWrong"] == 1
+
+
+def test_packed_wrong_is_only_reported_when_answers_came_from_the_labels(tmp_path):
+    cw = StubCloudWatch()
+    AwsReporter("b", "ap-south-1", s3=StubS3(), cloudwatch=cw)(run(tmp_path, reviewer="person"), str(tmp_path))
+    assert "PackedWrong" not in {m["MetricName"] for m in cw.calls[0][1]}
+
+
+def test_a_failed_upload_never_breaks_the_run(tmp_path):
+    cw = StubCloudWatch()
+    AwsReporter("b", "ap-south-1", s3=StubS3(fail=True), cloudwatch=cw)(run(tmp_path), str(tmp_path))
+    assert cw.calls  # metrics still published
