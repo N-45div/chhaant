@@ -25,7 +25,11 @@ ITEM_RADIUS = 0.022
 CRATE = np.array([0.20, -0.14, 0.0])
 TURNTABLE = np.array([0.24, 0.08, 0.0])
 TURNTABLE_TOP = 0.03
-BINS = {"pack": np.array([0.04, 0.24, 0.0]), "reject": np.array([0.02, -0.26, 0.0])}
+BINS = {"pack": np.array([0.04, 0.24, 0.0]), "sell_today": np.array([0.15, 0.21, 0.0]),
+        "reject": np.array([0.02, -0.26, 0.0])}
+BIN_RGBA = {"pack": (0.2, 0.6, 0.3, 1), "sell_today": (0.95, 0.65, 0.15, 1), "reject": (0.75, 0.2, 0.2, 1)}
+BIN_SLOT = 0.03     # items in a bin sit side by side on a 3 x 3 grid
+BIN_SLOTS = [(0, 0), (1, 0), (-1, 0), (0, 1), (1, 1), (-1, 1), (0, -1), (1, -1), (-1, -1)]
 HOVER = 0.09        # height above a spot when approaching it
 PHYSICS_PER_FRAME = 8
 
@@ -60,7 +64,7 @@ def build_spec(item_rgba: list[tuple[float, float, float, float]]) -> mujoco.MjS
                       gaintype=mujoco.mjtGain.mjGAIN_FIXED, biastype=mujoco.mjtBias.mjBIAS_AFFINE,
                       gainprm=[20] + [0] * 9, biasprm=[0, -20, -1] + [0] * 7)
 
-    for name, rgba in (("pack", (0.2, 0.6, 0.3, 1)), ("reject", (0.75, 0.2, 0.2, 1))):
+    for name, rgba in BIN_RGBA.items():
         b = world.add_body(name=f"bin_{name}", pos=BINS[name].tolist())
         _add_box(b, (0.05, 0.05, 0.003), rgba)
 
@@ -94,6 +98,8 @@ class SimCell:
         self.on_table: int | None = None
         self.table_angle = 0.0
         self.where = ["crate"] * self.n_items
+        self.bin_count = {name: 0 for name in BINS}
+        self.pose_sink = None  # callable(data) per frame: streams poses instead of rendering pixels
         self._ik_data = mujoco.MjData(self.model)
         self.width, self.height = width, height
         self._renderer = None
@@ -141,6 +147,8 @@ class SimCell:
             self.data.mocap_quat[self.mocap[self.on_table]] = [np.cos(angle / 2), 0, 0, np.sin(angle / 2)]
 
     def _frame(self) -> None:
+        if self.pose_sink is not None:
+            self.pose_sink(self.data)
         if not self.record:
             return
         if self._renderer is None:
@@ -194,7 +202,13 @@ class SimCell:
         if where == "turntable":
             spot = TURNTABLE + np.array([0, 0, TURNTABLE_TOP + ITEM_RADIUS + 0.004])
         elif where in BINS:
-            spot = BINS[where] + np.array([0, 0, ITEM_RADIUS + 0.004])
+            k = self.bin_count[where]
+            self.bin_count[where] += 1
+            dx, dy = BIN_SLOTS[k % len(BIN_SLOTS)]  # fill from the centre outwards
+            offset = np.array([dx * BIN_SLOT, dy * BIN_SLOT, 0.0])
+            spot = BINS[where] + offset + np.array([0, 0, ITEM_RADIUS + 0.004])
+        elif where == "crate":
+            spot = crate_slot(self.held, self.n_items)
         else:
             raise ValueError(f"unknown place: {where}")
         above = spot + np.array([0, 0, HOVER])
@@ -212,3 +226,9 @@ class SimCell:
         self.table_angle += np.radians(degrees)
         self.data.ctrl[self.table_ctrl] = self.table_angle
         self.run(0.8)
+
+    def rotate_turntable_to(self, degrees: float) -> None:
+        """Turn the plate to an absolute angle by the shortest way round."""
+        target = np.radians(degrees)
+        delta = (target - self.table_angle + np.pi) % (2 * np.pi) - np.pi
+        self.rotate_turntable(np.degrees(delta))

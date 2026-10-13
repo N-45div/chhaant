@@ -23,7 +23,8 @@ def cell():
     return SimCell([RED] * 6)
 
 
-@pytest.mark.parametrize("target", [CRATE + [0, 0, 0.12], TURNTABLE + [0, 0, 0.12], BINS["pack"] + [0, 0, 0.1], BINS["reject"] + [0, 0, 0.1]])
+@pytest.mark.parametrize("target", [CRATE + [0, 0, 0.12], TURNTABLE + [0, 0, 0.12], BINS["pack"] + [0, 0, 0.1],
+                                    BINS["sell_today"] + [0, 0, 0.1], BINS["reject"] + [0, 0, 0.1]])
 def test_ik_reaches_each_station_pointing_down(cell, target):
     q = cell.ik(np.array(target))
     d = cell._ik_data
@@ -63,3 +64,32 @@ def test_wrong_order_of_actions_is_refused(cell):
         cell.pick(1)
     with pytest.raises(ValueError):
         cell.place("floor")
+
+
+def test_items_in_one_bin_sit_side_by_side(cell):
+    for i in (0, 1):
+        cell.pick(i)
+        cell.place("sell_today")
+    assert np.linalg.norm(cell.item_pos(0)[:2] - cell.item_pos(1)[:2]) > 0.02
+
+
+def test_item_can_go_back_to_its_crate_slot(cell):
+    home = cell.item_pos(3).copy()
+    cell.pick(3)
+    cell.place("turntable")
+    cell.pick(3)
+    cell.place("crate")
+    assert np.linalg.norm(cell.item_pos(3) - home) < 1e-6 and cell.where[3] == "crate"
+
+
+def test_turntable_turns_to_an_absolute_angle_the_short_way(cell):
+    cell.rotate_turntable_to(350)
+    angle = cell.data.qpos[cell.model.joint("turntable").qposadr[0]]
+    assert angle == pytest.approx(np.radians(-10), abs=0.05)
+
+
+def test_poses_stream_to_a_sink(cell):
+    frames = []
+    cell.pose_sink = lambda data: frames.append(data.xpos.copy())
+    cell.run(0.5)
+    assert len(frames) >= 10  # one frame every 8 physics steps of 5 ms: 25 per second
