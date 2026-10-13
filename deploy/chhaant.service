@@ -1,0 +1,20 @@
+[Unit]
+Description=Chhaant web app (OpenCV 5 COOL + Bedrock agent)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+User=chhaant
+WorkingDirectory=/srv/chhaant
+EnvironmentFile=/etc/chhaant.env
+Environment=HOST=0.0.0.0 PORT=8000 CHHAANT_BACKEND=bedrock CHHAANT_RUNS=/srv/chhaant/data/runs PYTHONUNBUFFERED=1
+ExecStart=/opt/cool/venvs/python_3.12/bin/python -m chhaant.web
+Restart=always
+RestartSec=3
+NoNewPrivileges=true
+ProtectSystem=full
+ProtectHome=true
+PrivateTmp=true
+
+[Install]
+WantedBy=multi-user.target
