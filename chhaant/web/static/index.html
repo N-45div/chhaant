@@ -1,0 +1,64 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Chhaant</title>
+  <meta name="description" content="A robot cell that picks produce the way a careful shopper does, and asks a person when it is not sure.">
+  <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+  <header class="top">
+    <div>
+      <h1>Chhaant <span class="hi">छाँट</span></h1>
+      <p class="tag">A robot that picks produce the way a careful shopper does, and asks you when it is not sure.</p>
+    </div>
+    <span id="backend" class="pill muted">connecting…</span>
+  </header>
+
+  <main class="grid">
+    <section class="panel" aria-labelledby="h-order">
+      <h2 id="h-order">Order and crate</h2>
+      <label for="order" class="label">What should it pick?</label>
+      <textarea id="order" rows="4">Hi! For tonight's guacamole I need 2 avocados that are ripe today, plus 1 avocado for Saturday, three days from now. Also 2 good tomatoes for a salad, no rush on those.</textarea>
+
+      <fieldset class="choice">
+        <legend class="label">Who answers its questions?</legend>
+        <label><input type="radio" name="reviewer" value="person" checked> You, here on this page</label>
+        <label><input type="radio" name="reviewer" value="simulated"> A simulated reviewer (answers from the dataset labels)</label>
+      </fieldset>
+
+      <div class="label">The crate <span class="muted">(real photos: TR-6 produce from 16 angles, avocados from two sides)</span></div>
+      <div id="crate" class="thumbs"></div>
+
+      <button id="run" class="cta">Run the cell</button>
+      <p id="run-note" class="note muted">One run at a time. If one is already running, you will watch it.</p>
+    </section>
+
+    <section class="panel feed-panel" aria-labelledby="h-feed">
+      <h2 id="h-feed">What the agent is doing <span id="status" class="pill muted">idle</span></h2>
+      <ol id="feed" class="feed" aria-live="polite"></ol>
+    </section>
+
+    <section class="panel" aria-labelledby="h-result">
+      <h2 id="h-result">Result</h2>
+      <div id="lines"></div>
+      <h3>Elsewhere</h3>
+      <div id="bins"></div>
+      <div id="check" class="check" hidden></div>
+    </section>
+  </main>
+
+  <dialog id="evidence" aria-labelledby="ev-title">
+    <form method="dialog" class="close"><button aria-label="Close">×</button></form>
+    <h2 id="ev-title">Evidence</h2>
+    <div id="ev-body"></div>
+  </dialog>
+
+  <footer class="foot muted">
+    Vision runs on OpenCV 5 (segmentation, CIELAB colour, the quality model on the new DNN engine); the arm's moves are
+    simulated in MuJoCo. Photos: TriModal Ripeness 6 (CC BY 4.0) and the Hass avocado ripening dataset (CC BY 4.0).
+  </footer>
+  <script src="/static/app.js"></script>
+</body>
+</html>
