@@ -32,8 +32,7 @@ if [ "${1:-}" = "update" ]; then
     --comment "chhaant update $(git rev-parse --short HEAD)" --parameters commands="[
       \"/opt/cool/venvs/python_3.12/bin/python -c \\\"import boto3; boto3.client('s3', region_name='$REGION').download_file('$BUCKET', 'artifacts/chhaant.tar.gz', '/tmp/chhaant.tar.gz')\\\"\",
       \"tar xzf /tmp/chhaant.tar.gz -C /srv/chhaant\",
-      \"chown -R chhaant:chhaant /srv/chhaant\",
-      \"systemctl restart chhaant\"]" --query "Command.CommandId" --output text
+      \"CHHAANT_BUCKET=$BUCKET AWS_REGION=$REGION bash /srv/chhaant/deploy/bootstrap.sh\"]" --query "Command.CommandId" --output text
   exit 0
 fi
 
