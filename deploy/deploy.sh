@@ -10,7 +10,8 @@ STACK=${CHHAANT_STACK:-chhaant}
 cd "$(dirname "$0")/.."
 
 # Code: exactly the committed tree, nothing else from the working copy.
-git archive --format=tar.gz -o /tmp/chhaant.tar.gz HEAD
+mkdir -p data/deploy
+git archive --format=tar.gz -o data/deploy/chhaant.tar.gz HEAD
 
 if [ "${1:-}" != "update" ]; then
   aws s3api head-bucket --bucket "$BUCKET" 2>/dev/null || {
@@ -22,7 +23,7 @@ if [ "${1:-}" != "update" ]; then
   }
   aws s3 cp models/chhaant_quality_v1.onnx "s3://$BUCKET/artifacts/chhaant_quality_v1.onnx" --region "$REGION"
 fi
-aws s3 cp /tmp/chhaant.tar.gz "s3://$BUCKET/artifacts/chhaant.tar.gz" --region "$REGION"
+aws s3 cp data/deploy/chhaant.tar.gz "s3://$BUCKET/artifacts/chhaant.tar.gz" --region "$REGION"
 
 if [ "${1:-}" = "update" ]; then
   INSTANCE=$(aws cloudformation describe-stacks --stack-name "$STACK" --region "$REGION" \
