@@ -9,6 +9,9 @@
     POST /api/runs/{id}/answer           a person's answer {request_id, approved, answer}
     GET  /api/runs/{id}/items/{item}     the item's evidence pack
     GET  /api/photo?ref=tr6:...&w=256    a dataset photo (only from the two data folders)
+    GET  /api/sim/meshes                 the arm's simplified meshes (static, cacheable)
+    GET  /api/runs/{id}/sim/scene        the run's 3D twin: geoms, moving bodies, start poses
+    GET  /api/runs/{id}/sim?after=N      twin body poses from frame N, with captions
 """
 
 import os
@@ -17,6 +20,7 @@ from functools import lru_cache
 
 import cv2
 from fastapi import FastAPI, HTTPException, Request
+from fastapi.middleware.gzip import GZipMiddleware
 from fastapi.responses import FileResponse, JSONResponse, Response
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
@@ -52,8 +56,10 @@ def safe_photo_path(ref: str, roots: dict[str, str]) -> str:
     return path
 
 
-def create_app(manager: RunManager, photo_roots: dict[str, str], crate_preview, backend_name: str = "") -> FastAPI:
+def create_app(manager: RunManager, photo_roots: dict[str, str], crate_preview, backend_name: str = "",
+               sim_meshes=None) -> FastAPI:
     app = FastAPI(title="Chhaant", docs_url=None, redoc_url=None)
+    app.add_middleware(GZipMiddleware, minimum_size=1000)
     # Which OpenCV build is doing the vision: on the COOL AMI the HAL line names KleidiCV.
     build = {line.split(":", 1)[0].strip(): line.split(":", 1)[1].strip()
              for line in cv2.getBuildInformation().splitlines() if ":" in line and ("HAL" in line or "Baseline" in line)}
@@ -125,6 +131,26 @@ def create_app(manager: RunManager, photo_roots: dict[str, str], crate_preview, 
             return manager.evidence(run_id, item_id)
         except KeyError:
             raise HTTPException(404, "no such run or item")
+
+    @app.get("/api/sim/meshes")
+    def meshes():
+        if sim_meshes is None:
+            raise HTTPException(404, "the 3D cell runs only where MuJoCo is installed (the deployed server)")
+        return JSONResponse(sim_meshes(), headers={"Cache-Control": "public, max-age=86400"})
+
+    @app.get("/api/runs/{run_id}/sim/scene")
+    def sim_scene(run_id: str):
+        try:
+            return manager.sim_scene(run_id)
+        except KeyError:
+            raise HTTPException(404, "no 3D twin for this run")
+
+    @app.get("/api/runs/{run_id}/sim")
+    def sim_frames(run_id: str, after: int = 0):
+        try:
+            return JSONResponse(manager.sim_frames(run_id, max(0, after)), headers={"Cache-Control": "no-store"})
+        except KeyError:
+            raise HTTPException(404, "no 3D twin for this run")
 
     @app.get("/api/photo")
     def photo(ref: str, w: int = 0):
