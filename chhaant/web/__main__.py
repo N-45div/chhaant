@@ -40,8 +40,26 @@ def build_app():
     def crate(seed: int):
         return tuple(tr6_items(tr6, TR6_PICKS, seed) + avocado_items(avocado, AVOCADO_DAYS_LEFT, seed))
 
+    try:  # the 3D twin needs MuJoCo (present on the Linux server; blocked on some Windows setups)
+        from chhaant.sim.twin import SimTwin, TwinActuator, TwinInspectors
+        from chhaant.sim.web_scene import scene_meshes
+    except Exception:
+        SimTwin = None
+
     def make_cell(trace, reviewer, seed):
-        return Cell(list(crate(seed)), inspectors, trace=trace, reviewer=reviewer)
+        items = list(crate(seed))
+        if SimTwin is None:
+            return Cell(items, inspectors, trace=trace, reviewer=reviewer)
+        twin = SimTwin([(i.item_id, i.produce) for i in items])
+        cell = Cell(items, TwinInspectors(inspectors, twin), trace=trace, reviewer=reviewer, actuator=TwinActuator(twin))
+        cell.twin = twin
+        return cell
+
+    sim_meshes = None
+    if SimTwin is not None:
+        @lru_cache(maxsize=1)
+        def sim_meshes():
+            return scene_meshes(SimTwin([("x", "Tomato")]).cell.model)
 
     backend_kind = env("CHHAANT_BACKEND", "bedrock")
     if backend_kind == "nemotron":
@@ -64,7 +82,7 @@ def build_app():
     manager = RunManager(make_cell, make_backend, env("CHHAANT_RUNS", "data/runs"),
                          per_ip_per_hour=int(env("CHHAANT_RUNS_PER_HOUR", "6")), daily_cap=int(env("CHHAANT_DAILY_RUNS", "150")),
                          on_finish=hooks)
-    return create_app(manager, {"tr6": tr6, "avocado": avocado}, lambda seed: list(crate(seed)), label)
+    return create_app(manager, {"tr6": tr6, "avocado": avocado}, lambda seed: list(crate(seed)), label, sim_meshes)
 
 
 if __name__ == "__main__":
