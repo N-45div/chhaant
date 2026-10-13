@@ -33,6 +33,19 @@ pytest
 On AWS Graviton the same code runs on the Cloud-Optimized OpenCV Library (COOL)
 build that ships with the COOL AMI, instead of the PyPI wheel.
 
+## Run the web app
+
+```bash
+python kaggle/prep/prep.py         # or download the prep kernel's output into data/tr6
+python scripts/fetch_avocado.py    # avocado photos into data/avocado
+python -m chhaant.web              # then open http://127.0.0.1:8000
+```
+
+The agent runs on Amazon Bedrock by default (AWS credentials with Bedrock
+access); set `CHHAANT_BACKEND=nemotron` and `NEBIUS_API_KEY` to run it on NVIDIA
+Nemotron through Nebius Token Factory instead. Choose "You, here on this page"
+to answer the agent's questions yourself: it waits for your answer.
+
 ## Licence
 
 Apache License 2.0 (see [LICENSE](LICENSE)).
