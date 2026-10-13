@@ -12,6 +12,7 @@
 """
 
 import os
+import platform
 from functools import lru_cache
 
 import cv2
@@ -53,6 +54,10 @@ def safe_photo_path(ref: str, roots: dict[str, str]) -> str:
 
 def create_app(manager: RunManager, photo_roots: dict[str, str], crate_preview, backend_name: str = "") -> FastAPI:
     app = FastAPI(title="Chhaant", docs_url=None, redoc_url=None)
+    # Which OpenCV build is doing the vision: on the COOL AMI the HAL line names KleidiCV.
+    build = {line.split(":", 1)[0].strip(): line.split(":", 1)[1].strip()
+             for line in cv2.getBuildInformation().splitlines() if ":" in line and ("HAL" in line or "Baseline" in line)}
+    opencv = {"version": cv2.__version__, "build": build, "machine": platform.machine()}
     app.mount("/static", StaticFiles(directory=STATIC), name="static")
 
     @lru_cache(maxsize=512)
@@ -75,7 +80,7 @@ def create_app(manager: RunManager, photo_roots: dict[str, str], crate_preview, 
 
     @app.get("/api/health")
     def health():
-        return {"ok": True, "active": manager.active, "backend": backend_name}
+        return {"ok": True, "active": manager.active, "backend": backend_name, "opencv": opencv}
 
     @app.get("/api/crate")
     def crate(seed: int = 3):
