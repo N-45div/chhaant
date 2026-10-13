@@ -8,6 +8,8 @@ User=chhaant
 WorkingDirectory=/srv/chhaant
 EnvironmentFile=/etc/chhaant.env
 Environment=HOST=0.0.0.0 PORT=8000 CHHAANT_BACKEND=bedrock CHHAANT_RUNS=/srv/chhaant/data/runs PYTHONUNBUFFERED=1
+# COOL's OpenCV, as the venv's bin/activate sets it up
+Environment=PYTHONPATH=/opt/cool/python_3.12/site-packages/cv2/python-3.12 LD_LIBRARY_PATH=/opt/cool/cpp_sdk/lib:/opt/ffmpeg/lib
 ExecStart=/opt/cool/venvs/python_3.12/bin/python -m chhaant.web
 Restart=always
 RestartSec=3

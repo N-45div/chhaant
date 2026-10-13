@@ -3,6 +3,10 @@
 # (and safe to re-run). Expects CHHAANT_BUCKET and AWS_REGION in the environment.
 set -euxo pipefail
 PY=/opt/cool/venvs/python_3.12/bin/python
+# What the COOL venv's bin/activate exports: its cv2 lives outside the venv, with
+# the C++ SDK beside it. Non-login shells (user data, SSM) never run activate.
+export PYTHONPATH=/opt/cool/python_3.12/site-packages/cv2/python-3.12
+export LD_LIBRARY_PATH=/opt/cool/cpp_sdk/lib:/opt/ffmpeg/lib
 cd /srv/chhaant
 
 # App dependencies go into COOL's Python. Never install the PyPI OpenCV wheel here:
