@@ -124,3 +124,20 @@ def test_bad_requests_are_refused(client):
     assert c.post("/api/runs", json={"order": "two tomatoes", "reviewer": "robot"}).status_code == 400
     assert c.get("/api/runs/nope").status_code == 404
     assert c.post("/api/runs/nope/answer", json={"request_id": "Q1", "approved": True}).status_code == 409
+
+
+def test_health_reports_which_opencv_build_runs(client):
+    c, _ = client
+    info = c.get("/api/health").json()["opencv"]
+    assert info["version"].startswith("5.") and "Custom HAL" in info["build"]
+
+
+def test_finished_runs_reach_the_reporting_hooks(client):
+    c, manager = client
+    seen = []
+    manager.on_finish.append(lambda run, runs_dir: seen.append(run.id))
+    manager.on_finish.append(lambda run, runs_dir: 1 / 0)  # a broken hook must not break the run
+    rid = c.post("/api/runs", json={"order": "two tomatoes", "reviewer": "simulated"}).json()["id"]
+    snap = wait_for(c, rid, lambda s: s["status"] != "running")
+    assert snap["status"] == "done" and seen == [rid]
+    assert any(e["kind"] == "hook_error" for e in manager.runs[rid].cell.trace.events)

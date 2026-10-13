@@ -8,6 +8,7 @@ Settings come from the environment:
     CHHAANT_BEDROCK_MODEL, AWS_REGION
     NEBIUS_API_KEY, NEBIUS_MODEL   for the Nemotron backend on Nebius Token Factory
     CHHAANT_RUNS_PER_HOUR, CHHAANT_DAILY_RUNS, HOST, PORT
+    CHHAANT_EVIDENCE_BUCKET        if set, each run's trace goes to S3 and metrics to CloudWatch
 """
 
 import os
@@ -56,8 +57,13 @@ def build_app():
         def make_backend():
             return BedrockBackend(model, env("AWS_REGION", "ap-south-1"))
 
+    hooks = []
+    if env("CHHAANT_EVIDENCE_BUCKET"):
+        from chhaant.web.aws import AwsReporter
+        hooks.append(AwsReporter(env("CHHAANT_EVIDENCE_BUCKET"), env("AWS_REGION", "ap-south-1")))
     manager = RunManager(make_cell, make_backend, env("CHHAANT_RUNS", "data/runs"),
-                         per_ip_per_hour=int(env("CHHAANT_RUNS_PER_HOUR", "6")), daily_cap=int(env("CHHAANT_DAILY_RUNS", "150")))
+                         per_ip_per_hour=int(env("CHHAANT_RUNS_PER_HOUR", "6")), daily_cap=int(env("CHHAANT_DAILY_RUNS", "150")),
+                         on_finish=hooks)
     return create_app(manager, {"tr6": tr6, "avocado": avocado}, lambda seed: list(crate(seed)), label)
 
 

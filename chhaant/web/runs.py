@@ -54,12 +54,13 @@ def thumb_ref(item) -> str:
 
 class RunManager:
     def __init__(self, make_cell, make_backend, runs_dir: str, per_ip_per_hour: int = 6,
-                 daily_cap: int = 150, person_timeout_s: float = 300.0):
+                 daily_cap: int = 150, person_timeout_s: float = 300.0, on_finish: list | None = None):
         self.make_cell = make_cell          # (trace, reviewer, seed) -> Cell
         self.make_backend = make_backend    # () -> language-model backend
         self.runs_dir = runs_dir
         self.per_ip_per_hour, self.daily_cap = per_ip_per_hour, daily_cap
         self.person_timeout_s = person_timeout_s
+        self.on_finish = list(on_finish or [])  # callables (run, runs_dir), e.g. the S3/CloudWatch reporter
         self.runs: dict[str, Run] = {}
         self.active: str | None = None
         self._lock = threading.Lock()
@@ -109,6 +110,11 @@ class RunManager:
             with open(os.path.join(self.runs_dir, run.id, "result.json"), "w") as fh:
                 json.dump({"order": run.order, "status": run.status, "error": run.error, "result": run.result,
                            "reviewer": run.reviewer_mode, "seed": run.seed}, fh, indent=1, default=str)
+            for hook in self.on_finish:
+                try:
+                    hook(run, self.runs_dir)
+                except Exception as err:  # a reporting hook must never break the run
+                    run.cell.trace.log("hook_error", error=f"{type(err).__name__}: {err}")
 
     def answer(self, run_id: str, request_id: str, approved: bool, answer: str) -> bool:
         run = self.runs.get(run_id)
