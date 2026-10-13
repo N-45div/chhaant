@@ -11,7 +11,8 @@ cd "$(dirname "$0")/.."
 
 # Code: exactly the committed tree, nothing else from the working copy.
 mkdir -p data/deploy
-git archive --format=tar.gz -o data/deploy/chhaant.tar.gz HEAD
+# autocrlf off: on Windows, git archive would otherwise write CRLF scripts that bash on the server rejects
+git -c core.autocrlf=false archive --format=tar.gz -o data/deploy/chhaant.tar.gz HEAD
 
 if [ "${1:-}" != "update" ]; then
   aws s3api head-bucket --bucket "$BUCKET" 2>/dev/null || {
