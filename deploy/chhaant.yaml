@@ -1,0 +1,159 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Description: >
+  Chhaant on AWS: one Graviton4 instance running the Cloud-Optimized OpenCV
+  Library (COOL) AMI, behind CloudFront. Bedrock is called with the instance
+  role (no keys on disk); every run's evidence goes to S3 and its metrics to
+  CloudWatch. The instance only accepts traffic from CloudFront and is managed
+  through SSM (no SSH).
+
+Parameters:
+  ArtifactBucket:
+    Type: String
+    Description: Bucket holding artifacts/ (code tarball, model) and receiving runs/ (evidence)
+  ArtifactKey:
+    Type: String
+    Default: artifacts/chhaant.tar.gz
+  AmiId:
+    Type: AWS::EC2::Image::Id
+    Default: ami-05a336eb12c47d427
+    Description: COOL for Graviton4 (OpenCV 5 with Arm KleidiCV), ap-south-1
+  InstanceType:
+    Type: String
+    Default: c8g.large
+    AllowedValues: [c8g.large, c8g.xlarge, m8g.large, m8g.xlarge]
+  CloudFrontPrefixList:
+    Type: String
+    Default: pl-9aa247f3
+    Description: com.amazonaws.global.cloudfront.origin-facing in ap-south-1
+  BedrockModel:
+    Type: String
+    Default: global.anthropic.claude-haiku-4-5-20251001-v1:0
+
+Resources:
+  Role:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal: {Service: ec2.amazonaws.com}
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/AmazonSSMManagedInstanceCore
+      Policies:
+        - PolicyName: chhaant-app
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Sid: ReadArtifacts
+                Effect: Allow
+                Action: s3:GetObject
+                Resource: !Sub arn:aws:s3:::${ArtifactBucket}/artifacts/*
+              - Sid: WriteEvidence
+                Effect: Allow
+                Action: s3:PutObject
+                Resource: !Sub arn:aws:s3:::${ArtifactBucket}/runs/*
+              - Sid: CallTheModel
+                Effect: Allow
+                Action: [bedrock:InvokeModel, bedrock:InvokeModelWithResponseStream]
+                Resource:
+                  - !Sub arn:aws:bedrock:${AWS::Region}:${AWS::AccountId}:inference-profile/${BedrockModel}
+                  - arn:aws:bedrock:*::foundation-model/anthropic.claude-haiku-4-5-20251001-v1:0
+              - Sid: Metrics
+                Effect: Allow
+                Action: cloudwatch:PutMetricData
+                Resource: "*"
+                Condition:
+                  StringEquals: {cloudwatch:namespace: Chhaant}
+
+  InstanceProfile:
+    Type: AWS::IAM::InstanceProfile
+    Properties:
+      Roles: [!Ref Role]
+
+  OriginSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: Chhaant origin, reachable only from CloudFront
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: 8000
+          ToPort: 8000
+          SourcePrefixListId: !Ref CloudFrontPrefixList
+          Description: CloudFront origin-facing addresses only
+
+  Instance:
+    Type: AWS::EC2::Instance
+    Properties:
+      ImageId: !Ref AmiId
+      InstanceType: !Ref InstanceType
+      IamInstanceProfile: !Ref InstanceProfile
+      SecurityGroupIds: [!GetAtt OriginSecurityGroup.GroupId]
+      MetadataOptions: {HttpTokens: required, HttpEndpoint: enabled}
+      BlockDeviceMappings:
+        - DeviceName: /dev/sda1
+          Ebs: {VolumeSize: 30, VolumeType: gp3, Encrypted: true}
+      Tags:
+        - {Key: Name, Value: chhaant}
+        - {Key: project, Value: opencv-comp}
+      UserData:
+        Fn::Base64: !Sub |
+          #!/bin/bash
+          set -euxo pipefail
+          exec > /var/log/chhaant-bootstrap.log 2>&1
+          PY=/opt/cool/venvs/python_3.12/bin/python
+          $PY -m pip install --quiet boto3==1.42.29
+          $PY -c "import boto3; boto3.client('s3', region_name='${AWS::Region}').download_file('${ArtifactBucket}', '${ArtifactKey}', '/tmp/chhaant.tar.gz')"
+          mkdir -p /srv/chhaant
+          tar xzf /tmp/chhaant.tar.gz -C /srv/chhaant
+          CHHAANT_BUCKET=${ArtifactBucket} AWS_REGION=${AWS::Region} CHHAANT_BEDROCK_MODEL=${BedrockModel} bash /srv/chhaant/deploy/bootstrap.sh
+
+  Address:
+    Type: AWS::EC2::EIP
+    Properties:
+      InstanceId: !Ref Instance
+      Tags:
+        - {Key: Name, Value: chhaant}
+
+  Distribution:
+    Type: AWS::CloudFront::Distribution
+    Properties:
+      DistributionConfig:
+        Enabled: true
+        Comment: Chhaant
+        HttpVersion: http2and3
+        PriceClass: PriceClass_200
+        Origins:
+          - Id: chhaant-origin
+            # the Elastic IP's public DNS name: ec2-a-b-c-d.<region>.compute.amazonaws.com
+            DomainName: !Join ["", ["ec2-", !Join ["-", !Split [".", !Ref Address]], ".", !Ref "AWS::Region", ".compute.amazonaws.com"]]
+            CustomOriginConfig:
+              HTTPPort: 8000
+              OriginProtocolPolicy: http-only
+              OriginReadTimeout: 60
+        DefaultCacheBehavior:
+          TargetOriginId: chhaant-origin
+          ViewerProtocolPolicy: redirect-to-https
+          AllowedMethods: [GET, HEAD, OPTIONS, PUT, POST, PATCH, DELETE]
+          CachePolicyId: 4135ea2d-6df8-44a3-9df3-4b5a84be39ad        # Managed-CachingDisabled (live run state)
+          OriginRequestPolicyId: b689b0a8-53d0-40ab-baf2-68738e2966ac # Managed-AllViewerExceptHostHeader
+        CacheBehaviors:
+          - PathPattern: /static/*
+            TargetOriginId: chhaant-origin
+            ViewerProtocolPolicy: redirect-to-https
+            CachePolicyId: 4cc15a8a-d715-48a4-82b8-cc0b614638fe      # UseOriginCacheControlHeaders-QueryStrings
+            OriginRequestPolicyId: b689b0a8-53d0-40ab-baf2-68738e2966ac
+          - PathPattern: /api/photo*
+            TargetOriginId: chhaant-origin
+            ViewerProtocolPolicy: redirect-to-https
+            CachePolicyId: 4cc15a8a-d715-48a4-82b8-cc0b614638fe
+            OriginRequestPolicyId: b689b0a8-53d0-40ab-baf2-68738e2966ac
+
+Outputs:
+  Url:
+    Value: !Sub https://${Distribution.DomainName}
+  InstanceId:
+    Value: !Ref Instance
+  OriginAddress:
+    Value: !Ref Address
