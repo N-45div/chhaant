@@ -1,7 +1,8 @@
 """The simulated cell as data a browser can draw with three.js.
 
 * ``scene_geoms``: every visible geom with its body, local pose, shape, size
-  and colour (collision-only geoms are skipped).
+  and colour. Visible means the groups MuJoCo's own viewer shows by default
+  (0-2); the SO-101's collision meshes (3) and its red jaw parts (4) stay out.
 * ``scene_meshes``: the arm's meshes, simplified for the web by vertex
   clustering (vertices within ``cell`` metres merge). The SO-101 visual
   meshes are ~205k vertices and ~410k triangles raw; clustering at 2 mm keeps
@@ -17,7 +18,7 @@ import base64
 import mujoco
 import numpy as np
 
-COLLISION_GROUP = 3
+VISIBLE_GROUPS = (0, 1, 2)
 KINDS = {
     mujoco.mjtGeom.mjGEOM_PLANE: "plane", mujoco.mjtGeom.mjGEOM_SPHERE: "sphere",
     mujoco.mjtGeom.mjGEOM_CAPSULE: "capsule", mujoco.mjtGeom.mjGEOM_ELLIPSOID: "ellipsoid",
@@ -49,7 +50,7 @@ def _rgba(model, g: int) -> list[float]:
 
 
 def visible_geoms(model) -> list[int]:
-    return [g for g in range(model.ngeom) if model.geom_group[g] != COLLISION_GROUP
+    return [g for g in range(model.ngeom) if model.geom_group[g] in VISIBLE_GROUPS
             and int(model.geom_type[g]) in KINDS and _rgba(model, g)[3] > 0]
 
 

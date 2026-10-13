@@ -10,7 +10,7 @@ mujoco = pytest.importorskip("mujoco")
 
 from chhaant.sim.cell import BINS, SO101_XML, TURNTABLE  # noqa: E402
 from chhaant.sim.twin import SimTwin, TwinActuator, TwinInspectors  # noqa: E402
-from chhaant.sim.web_scene import COLLISION_GROUP, scene_geoms, scene_meshes, simplify, visible_geoms  # noqa: E402
+from chhaant.sim.web_scene import VISIBLE_GROUPS, scene_geoms, scene_meshes, simplify, visible_geoms  # noqa: E402
 
 pytestmark = pytest.mark.skipif(not os.path.exists(SO101_XML), reason="run scripts/fetch_so101.py first")
 ITEMS = [("T1", "Tomato"), ("T2", "Tomato"), ("A1", "Avocado")]
@@ -29,8 +29,9 @@ def test_scene_has_no_collision_geoms_and_much_lighter_meshes():
     geoms = scene_geoms(m)
     shown = visible_geoms(m)
     assert len(geoms) == len(shown) > 0
-    assert all(m.geom_group[g] != COLLISION_GROUP for g in shown)
-    assert any(m.geom_group[g] == COLLISION_GROUP for g in range(m.ngeom))  # there were some to leave out
+    assert all(m.geom_group[g] in VISIBLE_GROUPS for g in shown)
+    hidden = {int(m.geom_group[g]) for g in range(m.ngeom)} - set(VISIBLE_GROUPS)
+    assert {3, 4} <= hidden  # collision meshes and the jaw parts the MuJoCo viewer hides
     meshes = scene_meshes(m)
     faces = sum(x["nf"] for x in meshes.values())
     assert 0 < faces < 0.25 * m.nmeshface
