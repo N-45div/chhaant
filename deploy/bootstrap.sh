@@ -20,7 +20,13 @@ $PY -c "import boto3; boto3.client('s3', region_name='$AWS_REGION').download_fil
 
 # Data straight from the original sources (idempotent: present files are kept).
 if [ ! -f data/tr6/tr6_manifest.csv ]; then
-  CHHAANT_PREP_OUT=/srv/chhaant/data/tr6 CHHAANT_PREP_ZIP=0 $PY kaggle/prep/prep.py
+  mkdir -p data/tr6
+  # The prepared set deploy.sh uploads, if there is one; otherwise rebuild it from figshare (over an hour).
+  if $PY -c "import boto3; boto3.client('s3', region_name='$AWS_REGION').download_file('$CHHAANT_BUCKET', 'artifacts/tr6_512.tar.gz', '/tmp/tr6_512.tar.gz')"; then
+    tar xzf /tmp/tr6_512.tar.gz -C data/tr6
+  else
+    CHHAANT_PREP_OUT=/srv/chhaant/data/tr6 CHHAANT_PREP_ZIP=0 $PY kaggle/prep/prep.py
+  fi
 fi
 $PY scripts/fetch_avocado.py --out data/avocado --workers 16
 $PY scripts/fetch_so101.py

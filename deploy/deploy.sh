@@ -26,6 +26,13 @@ if [ "${1:-}" != "update" ]; then
 fi
 aws s3 cp data/deploy/chhaant.tar.gz "s3://$BUCKET/artifacts/chhaant.tar.gz" --region "$REGION"
 
+# The prepared TR-6 photos (512 px, ~100 MB), once: rebuilding them from figshare's
+# ~10 GB zip takes the server over an hour. bootstrap.sh falls back to that if absent.
+if [ -f data/tr6/tr6_manifest.csv ] && ! aws s3api head-object --bucket "$BUCKET" --key artifacts/tr6_512.tar.gz --region "$REGION" >/dev/null 2>&1; then
+  tar czf data/deploy/tr6_512.tar.gz -C data/tr6 tr6_manifest.csv tr6_methane.csv tr6_512
+  aws s3 cp data/deploy/tr6_512.tar.gz "s3://$BUCKET/artifacts/tr6_512.tar.gz" --region "$REGION" --only-show-errors
+fi
+
 if [ "${1:-}" = "update" ]; then
   INSTANCE=$(aws cloudformation describe-stacks --stack-name "$STACK" --region "$REGION" \
     --query "Stacks[0].Outputs[?OutputKey=='InstanceId'].OutputValue" --output text)
