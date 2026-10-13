@@ -8,9 +8,12 @@ one) are refused until a person has approved them.
 ``SimulatedReviewer`` answers from the dataset's own labels so whole runs can
 be scored without a human in the loop; anything it answers is marked
 ``by="simulated reviewer"`` so it is never mistaken for a real person.
+``PersonReviewer`` is the real thing: the agent waits while a person answers
+in the web app, and a question nobody answers in time stays pending.
 """
 
 import itertools
+import threading
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 
@@ -75,3 +78,39 @@ class SimulatedReviewer:
         if req.kind == "reject":
             return not truth_ok_to_pack, "discard it" if not truth_ok_to_pack else "keep it, it is fine"
         return True, "fine to pack" if truth_ok_to_pack else "not fit for this order"
+
+
+class PersonReviewer:
+    """A real person answering through the web app. The agent waits up to ``timeout_s``."""
+
+    name = "person"
+
+    def __init__(self, timeout_s: float = 300.0):
+        self.timeout_s = timeout_s
+        self._waiting: dict[str, list] = {}
+        self._lock = threading.Lock()
+
+    def review(self, req: Request, truth_ok_to_pack: bool) -> tuple[bool, str] | None:
+        """Block the agent until a person answers ``req``; None if nobody answers in time."""
+        done = threading.Event()
+        with self._lock:
+            self._waiting[req.id] = [done, None]
+        answered = done.wait(self.timeout_s)
+        with self._lock:
+            slot = self._waiting.pop(req.id, [done, None])
+        return slot[1] if answered else None
+
+    def answer(self, request_id: str, approved: bool, answer: str) -> bool:
+        """Called by the web app; False if nothing is waiting on that request."""
+        with self._lock:
+            slot = self._waiting.get(request_id)
+            if slot is None:
+                return False
+            slot[1] = (bool(approved), answer)
+            slot[0].set()
+        return True
+
+    @property
+    def waiting(self) -> list[str]:
+        with self._lock:
+            return list(self._waiting)

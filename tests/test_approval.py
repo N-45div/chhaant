@@ -1,8 +1,10 @@
 import json
+import threading
+import time
 
 import pytest
 
-from chhaant.agent.approval import ApprovalQueue, SimulatedReviewer
+from chhaant.agent.approval import ApprovalQueue, PersonReviewer, SimulatedReviewer
 from chhaant.agent.trace import Trace
 
 
@@ -44,3 +46,25 @@ def test_trace_writes_one_json_line_per_event(tmp_path):
     assert [e["kind"] for e in lines] == ["tool_call", "tool_result"]
     assert lines[1]["output"]["verdict"] == "clean" and lines[0]["t"] <= lines[1]["t"]
     assert len(tr.of_kind("tool_call")) == 1
+
+
+def test_person_reviewer_waits_for_the_web_answer():
+    q, person = ApprovalQueue(), PersonReviewer(timeout_s=5)
+    req = q.ask("T1", "pack", "Pack?", {})
+    got = {}
+    t = threading.Thread(target=lambda: got.update(v=person.review(req, True)))
+    t.start()
+    for _ in range(100):
+        if person.waiting:
+            break
+        time.sleep(0.01)
+    assert person.waiting == ["Q1"]
+    assert person.answer("Q1", True, "yes, pack it")
+    t.join(2)
+    assert got["v"] == (True, "yes, pack it") and not person.waiting
+
+
+def test_person_reviewer_times_out_and_leaves_it_pending():
+    req = ApprovalQueue().ask("T1", "pack", "Pack?", {})
+    assert PersonReviewer(timeout_s=0.05).review(req, True) is None
+    assert not PersonReviewer().answer("Q9", True, "nobody asked")

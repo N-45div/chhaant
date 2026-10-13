@@ -167,9 +167,13 @@ class Cell:
         if self.reviewer is not None:
             item = self.items[item_id]
             eat = next((ln.eat_in_days for ln in self.order if ln.produce == item.produce and ln.open), None)
-            approved, answer = self.reviewer.review(req, item.ok_to_pack(eat))
-            self.queue.answer(req.id, approved, answer, by=self.reviewer.name)
-            self.trace.log("answer", request=req.id, approved=approved, answer=answer, by=self.reviewer.name)
+            verdict = self.reviewer.review(req, item.ok_to_pack(eat))
+            if verdict is None:  # a person did not answer in time: the question stays pending
+                self.trace.log("no_answer", request=req.id)
+            else:
+                approved, answer = verdict
+                self.queue.answer(req.id, approved, answer, by=self.reviewer.name)
+                self.trace.log("answer", request=req.id, approved=approved, answer=answer, by=self.reviewer.name)
         return {"ok": True, "request_id": req.id, "status": req.status, "answer": req.answer or None, "by": req.by or None}
 
     def place(self, item_id: str, destination: str, order_line: int | None = None, reason: str = "") -> dict:
