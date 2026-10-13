@@ -130,6 +130,8 @@ async function poll() {
 
 function watch(id) {
   runId = id; cursor = 0; pendingCalls.length = 0; answered.clear();
+  window.chhaantRun = id;
+  window.dispatchEvent(new CustomEvent("chhaant:watch", { detail: id })); // the 3D viewer follows the same run
   $("#feed").innerHTML = ""; $("#check").hidden = true;
   if (timer) clearInterval(timer);
   timer = setInterval(poll, 900);

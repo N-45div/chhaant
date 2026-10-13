@@ -22,7 +22,11 @@ h3 { font-size: 13px; margin: 18px 0 8px; color: var(--muted); text-transform: u
 .grid { display: grid; grid-template-columns: minmax(260px, 1fr) minmax(340px, 1.6fr) minmax(260px, 1fr); gap: var(--gap); padding: var(--gap) 24px; align-items: start; }
 @media (max-width: 1000px) { .grid { grid-template-columns: 1fr; padding: var(--gap); } .top { padding: 14px 16px; } }
 .panel { background: var(--card); border: 1px solid var(--line); border-radius: var(--radius); padding: 16px; min-width: 0; }
-.feed-panel { min-height: 60vh; }
+.mid { display: flex; flex-direction: column; gap: var(--gap); min-width: 0; }
+.viewer { height: 340px; border-radius: 8px; overflow: hidden; background: var(--chip); }
+.viewer canvas { display: block; width: 100%; height: 100%; }
+.viewer-bar { display: flex; justify-content: space-between; align-items: center; margin-top: 8px; }
+.feed-panel { min-height: 40vh; }
 .label { display: block; font-weight: 600; font-size: 13px; margin: 12px 0 6px; }
 .muted { color: var(--muted); font-weight: 400; }
 textarea { width: 100%; font: inherit; color: inherit; background: var(--bg); border: 1px solid var(--line); border-radius: 8px; padding: 10px; resize: vertical; }
@@ -39,7 +43,7 @@ textarea { width: 100%; font: inherit; color: inherit; background: var(--bg); bo
 .pill.clean, .pill.done { background: var(--ok-bg); color: var(--ok); }
 .pill.defective, .pill.error { background: var(--bad-bg); color: var(--bad); }
 .pill.escalate, .pill.running { background: var(--warn-bg); color: var(--warn); }
-.feed { list-style: none; margin: 0; padding: 0 4px 0 0; display: flex; flex-direction: column; gap: 10px; max-height: 78vh; overflow-y: auto; }
+.feed { list-style: none; margin: 0; padding: 0 4px 0 0; display: flex; flex-direction: column; gap: 10px; max-height: 60vh; overflow-y: auto; }
 @media (max-width: 1000px) { .feed { max-height: 70vh; } }
 .ev { border: 1px solid var(--line); border-radius: 8px; padding: 10px 12px; }
 .ev.model { background: var(--chip); border-color: transparent; white-space: pre-wrap; }

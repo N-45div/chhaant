@@ -35,10 +35,17 @@
       <p id="run-note" class="note muted">One run at a time. If one is already running, you will watch it.</p>
     </section>
 
-    <section class="panel feed-panel" aria-labelledby="h-feed">
-      <h2 id="h-feed">What the agent is doing <span id="status" class="pill muted">idle</span></h2>
-      <ol id="feed" class="feed" aria-live="polite"></ol>
-    </section>
+    <div class="mid">
+      <section class="panel" aria-labelledby="h-cell">
+        <h2 id="h-cell">The cell <span class="muted">SO-101 arm simulated in MuJoCo; the photos it decides on are real</span></h2>
+        <div id="viewer" class="viewer" role="img" aria-label="3D view of the robot arm, turntable, crate and bins"></div>
+        <div class="viewer-bar"><span id="viewer-note" class="small muted">loading the 3D cell…</span><button id="replay" class="link">replay</button></div>
+      </section>
+      <section class="panel feed-panel" aria-labelledby="h-feed">
+        <h2 id="h-feed">What the agent is doing <span id="status" class="pill muted">idle</span></h2>
+        <ol id="feed" class="feed" aria-live="polite"></ol>
+      </section>
+    </div>
 
     <section class="panel" aria-labelledby="h-result">
       <h2 id="h-result">Result</h2>
@@ -59,6 +66,11 @@
     Vision runs on OpenCV 5 (segmentation, CIELAB colour, the quality model on the new DNN engine); the arm's moves are
     simulated in MuJoCo. Photos: TriModal Ripeness 6 (CC BY 4.0) and the Hass avocado ripening dataset (CC BY 4.0).
   </footer>
+  <script type="importmap">
+    {"imports": {"three": "https://cdn.jsdelivr.net/npm/three@0.170.0/build/three.module.js",
+                 "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.170.0/examples/jsm/"}}
+  </script>
   <script src="/static/app.js"></script>
+  <script type="module" src="/static/viewer.js"></script>
 </body>
 </html>
