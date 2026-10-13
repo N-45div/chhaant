@@ -93,7 +93,7 @@ Resources:
       MetadataOptions: {HttpTokens: required, HttpEndpoint: enabled}
       BlockDeviceMappings:
         - DeviceName: /dev/sda1
-          Ebs: {VolumeSize: 30, VolumeType: gp3, Encrypted: true}
+          Ebs: {VolumeSize: 60, VolumeType: gp3, Encrypted: true}  # the COOL AMI snapshot is 60 GB
       Tags:
         - {Key: Name, Value: chhaant}
         - {Key: project, Value: opencv-comp}
