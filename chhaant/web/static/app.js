@@ -5,7 +5,7 @@ const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "
 const angle = (l) => ("azimuth" in l ? (l.azimuth == null ? "overhead" : `${l.azimuth}°`) : "side photo");
 const fmtForecast = (f) => (f ? `${f.days} days left (${f.low}-${f.high})` : "no shelf-life number");
 
-let runId = null, cursor = 0, timer = null, items = {};
+let runId = null, cursor = 0, timer = null, items = {}, live = false;
 const answered = new Set();
 
 async function api(path, opts = {}) {
@@ -17,15 +17,17 @@ async function api(path, opts = {}) {
 async function loadCrate() {
   const { body } = await api("/api/crate?seed=3");
   $("#crate").innerHTML = body.items.map((i) =>
-    `<div class="thumb" title="${esc(i.produce)}"><img src="${photo(i.thumb)}" alt="${esc(i.item_id)}, ${esc(i.produce)}" loading="lazy"><span>${esc(i.item_id)}</span></div>`).join("");
+    `<div class="thumb" title="${esc(i.produce)}"><img src="${photo(i.thumb)}" alt="${esc(i.item_id)}, ${esc(i.produce)}"><span>${esc(i.item_id)}</span></div>`).join("");
 }
 
 function li(cls, html) {
+  const feed = $("#feed");
+  const following = feed.scrollHeight - feed.scrollTop - feed.clientHeight < 120;
   const el = document.createElement("li");
   el.className = `ev ${cls}`;
   el.innerHTML = html;
-  $("#feed").appendChild(el);
-  el.scrollIntoView({ block: "nearest" });
+  feed.appendChild(el);
+  if (live && following) feed.scrollTop = feed.scrollHeight;  // follow a live run inside the feed only
   return el;
 }
 
@@ -53,7 +55,7 @@ function renderToolResult(tool, input, out) {
 async function fillViews(itemId, box) {
   const { body } = await api(`/api/runs/${runId}/items/${itemId}`);
   const looks = body.inspection?.looks || [];
-  box.innerHTML = looks.map((l) => `<div class="view"><img src="${photo(l.photo, 152)}" alt="view of ${esc(itemId)}" loading="lazy">
+  box.innerHTML = looks.map((l) => `<div class="view"><img src="${photo(l.photo, 152)}" alt="view of ${esc(itemId)}">
     ${angle(l)}${l.defect != null ? `<br>defect ${l.defect}` : ""}${l.ripeness != null ? `<br>ripe ${l.ripeness}` : ""}</div>`).join("");
 }
 
@@ -116,6 +118,7 @@ async function poll() {
   if (!runId) return;
   const { ok, body } = await api(`/api/runs/${runId}?after=${cursor}`);
   if (!ok) return;
+  live = body.status === "running";
   body.events.forEach(renderEvent);
   cursor = body.next;
   renderWaiting(body.waiting);
