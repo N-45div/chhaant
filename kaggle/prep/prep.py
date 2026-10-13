@@ -29,7 +29,8 @@ import cv2
 import numpy as np
 
 ARTICLE = 30783827
-OUT = "/kaggle/working"
+OUT = os.environ.get("CHHAANT_PREP_OUT", "/kaggle/working")  # set it to run outside Kaggle (e.g. the server)
+PACK = os.environ.get("CHHAANT_PREP_ZIP", "1") == "1"         # Kaggle downloads one zip faster than many files
 IMG_DIR = os.path.join(OUT, "tr6_512")
 MAX_SIDE = 512
 SESSION_GAP_S = 90  # photos of one fruit are ~5 s apart; fruits are hours apart
@@ -271,6 +272,8 @@ def inventory(root="/kaggle/input", max_depth=10):
 
 
 if __name__ == "__main__":
+    os.makedirs(OUT, exist_ok=True)
     inventory()
     build_tr6()
-    pack_images()
+    if PACK:
+        pack_images()
