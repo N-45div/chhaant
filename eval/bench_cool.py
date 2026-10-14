@@ -31,8 +31,8 @@ import cv2
 import numpy as np
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
-from chhaant.decide.shelf import measure  # noqa: E402
-from chhaant.vision.color import lab_image  # noqa: E402
+from chhaant.decide.shelf import COLOUR_ERODE_PX, measure  # noqa: E402
+from chhaant.vision.color import _median_u8, item_window, lab_image  # noqa: E402
 from chhaant.vision.crop import item_crop  # noqa: E402
 from chhaant.vision.model import QualityModel  # noqa: E402
 from chhaant.vision.segment import WORK_SIDE, segment_fruit  # noqa: E402
@@ -117,15 +117,20 @@ def frame_ops(path: str, repeat: int) -> dict:
     small_mask = cv2.resize(mask, work_size, interpolation=cv2.INTER_NEAREST)
     k31 = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (31, 31))
     k7 = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (7, 7))
+    wb_rows, wb_cols = item_window(mask, 15)  # the windows the colour path works in
+    c_rows, c_cols = item_window(mask, COLOUR_ERODE_PX + 1)
+    backdrop = np.full(mask.shape, 255, np.uint8)
+    backdrop[wb_rows, wb_cols] = cv2.compare(cv2.dilate(mask[wb_rows, wb_cols], k31), 0, cv2.CMP_EQ)
     ops = {
         "imdecode camera JPEG": lambda: cv2.imdecode(jpeg, cv2.IMREAD_COLOR),
         "resize INTER_AREA to the 512 work size": lambda: cv2.resize(img, work_size, interpolation=cv2.INTER_AREA),
         "cvtColor BGR2GRAY": lambda: cv2.cvtColor(img, cv2.COLOR_BGR2GRAY),
         "cvtColor BGR2Lab, 8-bit": lambda: cv2.cvtColor(img, cv2.COLOR_BGR2Lab),
-        "cvtColor BGR2Lab, float (colour stats)": lambda: lab_image(img),
+        "cvtColor BGR2Lab, float, item window (colour stats)": lambda: lab_image(img[c_rows, c_cols]),
         "GaussianBlur 5x5": lambda: cv2.GaussianBlur(img, (5, 5), 0),
-        "dilate mask 31x31 (white balance)": lambda: cv2.dilate(mask, k31),
-        "erode mask 7x7 (colour stats)": lambda: cv2.erode(mask, k7),
+        "dilate 31x31, item window (white balance)": lambda: cv2.dilate(mask[wb_rows, wb_cols], k31),
+        "calcHist backdrop median, 3 channels (white balance)": lambda: _median_u8(img, backdrop),
+        "erode 7x7, item window (colour stats)": lambda: cv2.erode(mask[c_rows, c_cols], k7),
         "resize mask INTER_NEAREST to full size": lambda: cv2.resize(small_mask, (w, h), interpolation=cv2.INTER_NEAREST),
         "findContours on the full mask": lambda: cv2.findContours(mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE),
         "item_crop to 224 for the model": lambda: item_crop(img, mask),
