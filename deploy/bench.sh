@@ -25,7 +25,8 @@ fi
 
 PROFILE=$(aws cloudformation describe-stack-resource --stack-name "$STACK" --region "$REGION" \
   --logical-resource-id InstanceProfile --query StackResourceDetail.PhysicalResourceId --output text)
-UBUNTU_AMI=$(aws ssm get-parameter --region "$REGION" --query Parameter.Value --output text \
+# MSYS_NO_PATHCONV: Git Bash on Windows would rewrite the leading /aws/... into a Windows path.
+UBUNTU_AMI=$(MSYS_NO_PATHCONV=1 aws ssm get-parameter --region "$REGION" --query Parameter.Value --output text \
   --name /aws/service/canonical/ubuntu/server/24.04/stable/current/amd64/hvm/ebs-gp3/ami-id)
 # From the committed script, so a Windows checkout's CRLF never reaches bash on the instance.
 git show HEAD:deploy/bench_node.sh | sed -e "s/@BUCKET@/$BUCKET/" -e "s/@REGION@/$REGION/" -e "s/@RUN@/$RUN/" \
