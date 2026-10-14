@@ -66,7 +66,7 @@ def background_gains(bgr: np.ndarray, mask: np.ndarray, margin_px: int = 15) -> 
     # The dilation reaches margin_px past the item at most: only that window can stop being backdrop.
     rows, cols = item_window(mask, margin_px)
     background = np.full(mask.shape, 255, np.uint8)
-    background[rows, cols][cv2.dilate(mask[rows, cols], k) > 0] = 0
+    background[rows, cols] = cv2.compare(cv2.dilate(mask[rows, cols], k), 0, cv2.CMP_EQ)  # 255 off the item
     if cv2.countNonZero(background) < 500:
         return None
     ref = _median_u8(bgr, background)

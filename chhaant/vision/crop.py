@@ -39,7 +39,9 @@ def item_crop(bgr: np.ndarray, mask: np.ndarray | None = None, side: int = MODEL
 
     x0, y0 = int(round(cx - half)), int(round(cy - half))
     size = max(1, int(round(2 * half)))
-    crop = np.full((size, size, 3), NEUTRAL, np.uint8)  # the backdrop, and anything past the frame's edge
+    # The backdrop, and anything past the frame's edge. NEUTRAL is a grey, so one value
+    # fills all three channels: several times faster than broadcasting the tuple.
+    crop = np.full((size, size, 3), NEUTRAL[0] if len(set(NEUTRAL)) == 1 else NEUTRAL, np.uint8)
     _paste(crop, bgr, x0, y0, region, keep)
     interp = cv2.INTER_AREA if size > side else cv2.INTER_LINEAR
     return cv2.resize(crop, (side, side), interpolation=interp)
@@ -59,4 +61,4 @@ def _paste(canvas: np.ndarray, bgr: np.ndarray, x0: int, y0: int, region, keep) 
         dst[:] = src
     else:
         k = keep[iy0 - ry0:iy1 - ry0, ix0 - rx0:ix1 - rx0]
-        dst[k] = src[k]
+        np.copyto(dst, src, where=k[:, :, None])  # a masked copy, without fancy indexing's gather
