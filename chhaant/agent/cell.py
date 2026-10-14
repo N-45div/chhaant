@@ -55,6 +55,24 @@ class RecordingActuator:
         self.moves.append((item_id, destination))
 
 
+ALIASES = {"amla": "Indian_Gooseberry", "gooseberry": "Indian_Gooseberry", "indian_gooseberries": "Indian_Gooseberry"}
+
+
+def _produce_key(name: str) -> str:
+    return str(name).strip().lower().replace(" ", "_").replace("-", "_")
+
+
+def canonical_produce(name: str, known: set[str]) -> str | None:
+    """The crate's own name for ``name``, ignoring case, spaces and plurals ("avocados",
+    "tomatoes", "mangoes"), or None when the crate has nothing by that name."""
+    key = _produce_key(name)
+    by_key = {k.lower(): k for k in known}
+    for cand in (key, ALIASES.get(key, "").lower(), key[:-2] if key.endswith("es") else "", key[:-1] if key.endswith("s") else ""):
+        if cand and cand in by_key:
+            return by_key[cand]
+    return None
+
+
 def _forecast(f) -> dict | None:
     return None if f is None else {"days": round(f.days, 2), "low": round(f.low, 2), "high": round(f.high, 2)}
 
@@ -102,8 +120,11 @@ class Cell:
         if not lines:
             return self._refuse("read_order", "the order has no lines")
         order = []
+        known = {it.produce for it in self.items.values()}
         for n, ln in enumerate(lines, 1):
-            produce = str(ln.get("produce", "")).strip().title().replace(" ", "_")
+            raw = str(ln.get("produce", "")).strip()
+            # The crate's spelling, so "avocados" opens a line the avocados can fill.
+            produce = canonical_produce(raw, known) or ALIASES.get(_produce_key(raw)) or raw.title().replace(" ", "_")
             qty, eat = ln.get("quantity"), ln.get("eat_in_days")
             if not produce or not isinstance(qty, int) or qty < 1:
                 return self._refuse("read_order", f"line {n} needs a produce name and a whole quantity of at least 1")
@@ -114,8 +135,14 @@ class Cell:
         in_crate = {}
         for it in self.items.values():
             in_crate[it.produce] = in_crate.get(it.produce, 0) + 1
-        return {"ok": True, "order": [{"line": ln.line, "produce": ln.produce, "quantity": ln.quantity,
-                                       "eat_in_days": ln.eat_in_days, "in_crate": in_crate.get(ln.produce, 0)} for ln in order]}
+        rows = []
+        for ln in order:
+            row = {"line": ln.line, "produce": ln.produce, "quantity": ln.quantity,
+                   "eat_in_days": ln.eat_in_days, "in_crate": in_crate.get(ln.produce, 0)}
+            if ln.produce not in known:
+                row["note"] = f"no {ln.produce} in this crate; it holds {', '.join(sorted(known))}"
+            rows.append(row)
+        return {"ok": True, "order": rows}
 
     def list_crate(self) -> dict:
         rows = []

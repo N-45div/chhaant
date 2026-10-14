@@ -1,7 +1,7 @@
 import pytest
 
 from chhaant.agent.approval import SimulatedReviewer
-from chhaant.agent.cell import Cell
+from chhaant.agent.cell import Cell, canonical_produce
 from chhaant.agent.crate import CrateItem
 from chhaant.decide.forecast import Forecast
 
@@ -97,6 +97,27 @@ def test_items_cannot_be_placed_twice(cell):
 def test_order_lines_are_validated(cell):
     assert not cell.read_order([{"produce": "Tomato", "quantity": 0}])["ok"]
     assert not cell.read_order([{"produce": "Tomato", "quantity": 2, "eat_in_days": -1}])["ok"]
+
+
+def test_order_produce_uses_the_crates_names(cell):
+    # Live run 20261014-194352: the model wrote "avocados", every placement was refused.
+    out = cell.read_order([{"produce": "avocados", "quantity": 1, "eat_in_days": 0.5},
+                           {"produce": "TOMATOES", "quantity": 1, "eat_in_days": None},
+                           {"produce": "amla", "quantity": 1, "eat_in_days": None}])
+    assert [r["produce"] for r in out["order"]] == ["Avocado", "Tomato", "Indian_Gooseberry"]
+    assert [r["in_crate"] for r in out["order"]] == [2, 3, 0]
+    assert "note" not in out["order"][0] and "holds Avocado, Tomato" in out["order"][2]["note"]
+    cell.inspect("T1")
+    placed = cell.place("T1", "order", 2, "clean tomato")  # the line was asked for as "TOMATOES"
+    assert placed["ok"], placed
+
+
+@pytest.mark.parametrize("name,expected", [("Avocado", "Avocado"), ("avocados", "Avocado"), ("tomatoes", "Tomato"),
+                                           ("Indian gooseberry", "Indian_Gooseberry"), ("mangoes", "Mango"),
+                                           ("bananas", "Banana"), ("apples", None), ("s", None)])
+def test_canonical_produce(name, expected):
+    known = {"Avocado", "Tomato", "Indian_Gooseberry", "Mango", "Banana"}
+    assert canonical_produce(name, known) == expected
 
 
 def test_look_closer_only_for_turntable_items(cell):
