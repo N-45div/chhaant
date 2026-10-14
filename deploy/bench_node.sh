@@ -29,7 +29,8 @@ if [ -x $COOL ]; then
 else
   export DEBIAN_FRONTEND=noninteractive
   apt-get -o DPkg::Lock::Timeout=300 update -q
-  apt-get -o DPkg::Lock::Timeout=300 install -y -q python3-venv
+  # libGL and glib: the opencv-python wheel the project pins (not -headless) links them
+  apt-get -o DPkg::Lock::Timeout=300 install -y -q python3-venv libgl1 libglib2.0-0t64
   python3 -m venv /opt/bench
   PY=/opt/bench/bin/python
   $PY -m pip install -q numpy==2.4.3
