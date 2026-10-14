@@ -1,0 +1,455 @@
+{
+ "label": "c8g-pip",
+ "machine": {
+  "instance_type": "c8g.large",
+  "cpu": "CPU part: 0xd4f",
+  "arch": "aarch64",
+  "vcpus": 2,
+  "python": "3.12.3"
+ },
+ "opencv": {
+  "version": "5.0.0",
+  "file": "/opt/pipcv/cv2/__init__.py",
+  "custom_hal": "YES (carotene (ver 0.0.1) KleidiCV (ver 26.03))",
+  "baseline": "NEON FP16",
+  "dispatched": "NEON_DOTPROD NEON_FP16 NEON_BF16",
+  "parallel": "pthreads",
+  "threads": 2,
+  "numpy": "2.5.1"
+ },
+ "inputs": {
+  "camera_frames": 12,
+  "frame_size": [
+   4000,
+   3000
+  ],
+  "small_photos": 48,
+  "repeat": 20
+ },
+ "frame_ops": {
+  "imdecode camera JPEG": {
+   "median_ms": 67.518,
+   "p90_ms": 67.849,
+   "n": 20
+  },
+  "resize INTER_AREA to the 512 work size": {
+   "median_ms": 17.703,
+   "p90_ms": 17.752,
+   "n": 20
+  },
+  "cvtColor BGR2GRAY": {
+   "median_ms": 1.878,
+   "p90_ms": 1.898,
+   "n": 20
+  },
+  "cvtColor BGR2Lab, 8-bit": {
+   "median_ms": 18.563,
+   "p90_ms": 18.65,
+   "n": 20
+  },
+  "cvtColor BGR2Lab, float, item window (colour stats)": {
+   "median_ms": 13.883,
+   "p90_ms": 13.962,
+   "n": 20
+  },
+  "GaussianBlur 5x5": {
+   "median_ms": 7.598,
+   "p90_ms": 7.672,
+   "n": 20
+  },
+  "dilate 31x31, item window (white balance)": {
+   "median_ms": 24.658,
+   "p90_ms": 24.781,
+   "n": 20
+  },
+  "calcHist backdrop median, 3 channels (white balance)": {
+   "median_ms": 26.352,
+   "p90_ms": 26.43,
+   "n": 20
+  },
+  "erode 7x7, item window (colour stats)": {
+   "median_ms": 1.196,
+   "p90_ms": 1.206,
+   "n": 20
+  },
+  "resize mask INTER_NEAREST to full size": {
+   "median_ms": 2.961,
+   "p90_ms": 2.965,
+   "n": 20
+  },
+  "findContours on the full mask": {
+   "median_ms": 1.413,
+   "p90_ms": 1.445,
+   "n": 20
+  },
+  "item_crop to 224 for the model": {
+   "median_ms": 184.874,
+   "p90_ms": 185.326,
+   "n": 20
+  },
+  "threshold Otsu at work size": {
+   "median_ms": 0.113,
+   "p90_ms": 0.114,
+   "n": 20
+  },
+  "imencode JPEG q85 at work size (photo route)": {
+   "median_ms": 0.52,
+   "p90_ms": 0.525,
+   "n": 20
+  }
+ },
+ "looks": {
+  "look on a 512-px photo (the deployed app)": {
+   "median_ms": 18.076,
+   "p90_ms": 18.495,
+   "n": 96
+  },
+  "look on a camera frame (decode, segment, model)": {
+   "median_ms": 389.516,
+   "p90_ms": 442.588,
+   "n": 24
+  },
+  "avocado reading on a camera frame (adds white balance + colour)": {
+   "median_ms": 561.697,
+   "p90_ms": 717.184,
+   "n": 24
+  }
+ },
+ "model": {
+  "quality model, 1 crop, ENGINE_NEW": {
+   "median_ms": 8.647,
+   "p90_ms": 8.718,
+   "n": 40
+  },
+  "quality model, 1 crop, ENGINE_CLASSIC": {
+   "median_ms": 9.725,
+   "p90_ms": 9.761,
+   "n": 40
+  },
+  "quality model, batch of 8, ENGINE_NEW": {
+   "median_ms": 65.435,
+   "p90_ms": 65.582,
+   "n": 20
+  }
+ },
+ "readings": {
+  "camera_frames": {
+   "Banana_20250911_101403.jpg": {
+    "L": 59.50928,
+    "a": -4.1875,
+    "b": 43.48438,
+    "hue_deg": 95.50056,
+    "chroma": 43.68554,
+    "dark_frac": 0.04451,
+    "p_ripeness": 0.61897,
+    "p_defect": 0.54449
+   },
+   "Banana_20250915_092659.jpg": {
+    "L": 37.88452,
+    "a": 5.17188,
+    "b": 28.21875,
+    "hue_deg": 79.61421,
+    "chroma": 28.68878,
+    "dark_frac": 0.04722,
+    "p_ripeness": 0.89663,
+    "p_defect": 0.72695
+   },
+   "Carrot_20250725_084328.jpg": {
+    "L": 51.48315,
+    "a": 24.0625,
+    "b": 36.34375,
+    "hue_deg": 56.49222,
+    "chroma": 43.58752,
+    "dark_frac": 0.0,
+    "p_ripeness": 0.85216,
+    "p_defect": 0.58951
+   },
+   "Carrot_20250730_132147.jpg": {
+    "L": 41.75415,
+    "a": 20.42188,
+    "b": 31.89062,
+    "hue_deg": 57.36562,
+    "chroma": 37.86905,
+    "dark_frac": 0.00138,
+    "p_ripeness": 0.85365,
+    "p_defect": 0.39492
+   },
+   "Guava_20250625_091810.jpg": {
+    "L": 33.71582,
+    "a": -8.76562,
+    "b": 19.0625,
+    "hue_deg": 114.69468,
+    "chroma": 20.9813,
+    "dark_frac": 0.0,
+    "p_ripeness": 0.00032,
+    "p_defect": 0.58307
+   },
+   "Guava_20250701_083949.jpg": {
+    "L": 48.10181,
+    "a": -1.57812,
+    "b": 34.1875,
+    "hue_deg": 92.64295,
+    "chroma": 34.2239,
+    "dark_frac": 0.06311,
+    "p_ripeness": 0.02308,
+    "p_defect": 0.01889
+   },
+   "Indian_Gooseberry_20250723_092950.jpg": {
+    "L": 38.14697,
+    "a": -3.51562,
+    "b": 31.20312,
+    "hue_deg": 96.42835,
+    "chroma": 31.40055,
+    "dark_frac": 0.00988,
+    "p_ripeness": 0.00462,
+    "p_defect": 0.28241
+   },
+   "Indian_Gooseberry_20250807_165525.jpg": {
+    "L": 56.53076,
+    "a": -6.82812,
+    "b": 29.40625,
+    "hue_deg": 103.07241,
+    "chroma": 30.18859,
+    "dark_frac": 0.00779,
+    "p_ripeness": 0.00012,
+    "p_defect": 0.00721
+   },
+   "Mango_20250920_085358.jpg": {
+    "L": 48.31543,
+    "a": -10.89062,
+    "b": 35.29688,
+    "hue_deg": 107.14728,
+    "chroma": 36.9388,
+    "dark_frac": 0.00074,
+    "p_ripeness": 0.0271,
+    "p_defect": 0.09314
+   },
+   "Mango_20250924_162555.jpg": {
+    "L": 64.66064,
+    "a": 4.28125,
+    "b": 38.15625,
+    "hue_deg": 83.59801,
+    "chroma": 38.39568,
+    "dark_frac": 0.00092,
+    "p_ripeness": 0.70256,
+    "p_defect": 0.08518
+   },
+   "Tomato_20250723_092034.jpg": {
+    "L": 17.76123,
+    "a": 23.32812,
+    "b": 19.5625,
+    "hue_deg": 39.98253,
+    "chroma": 30.44491,
+    "dark_frac": 0.0,
+    "p_ripeness": 0.99944,
+    "p_defect": 3e-05
+   },
+   "Tomato_20250829_085412.jpg": {
+    "L": 49.24927,
+    "a": 35.04688,
+    "b": 37.375,
+    "hue_deg": 46.84124,
+    "chroma": 51.23645,
+    "dark_frac": 0.0,
+    "p_ripeness": 0.99997,
+    "p_defect": 0.00034
+   }
+  },
+  "small_photos": {
+   "tr6_512/Banana/20250911_101403.jpg": [
+    0.52663,
+    0.60926
+   ],
+   "tr6_512/Banana/20250913_093452.jpg": [
+    0.64681,
+    0.82961
+   ],
+   "tr6_512/Banana/20250917_092509.jpg": [
+    0.98943,
+    0.98042
+   ],
+   "tr6_512/Carrot/20250725_084446.jpg": [
+    0.56732,
+    0.87892
+   ],
+   "tr6_512/Carrot/20250728_132224.jpg": [
+    0.94978,
+    0.96018
+   ],
+   "tr6_512/Carrot/20250730_132159.jpg": [
+    0.99996,
+    0.98597
+   ],
+   "tr6_512/Carrot/20250801_170643.jpg": [
+    0.99414,
+    0.85998
+   ],
+   "tr6_512/Carrot/20250804_164823.jpg": [
+    0.99998,
+    0.89503
+   ],
+   "tr6_512/Guava/20250627_084028.jpg": [
+    0.17151,
+    0.00182
+   ],
+   "tr6_512/Guava/20250630_085023.jpg": [
+    0.27624,
+    0.04714
+   ],
+   "tr6_512/Guava/20250702_135920.jpg": [
+    0.83817,
+    0.68674
+   ],
+   "tr6_512/Guava/20250704_134806.jpg": [
+    0.94686,
+    0.94361
+   ],
+   "tr6_512/Indian_Gooseberry/20250723_161806.jpg": [
+    0.00106,
+    0.00024
+   ],
+   "tr6_512/Indian_Gooseberry/20250725_152034.jpg": [
+    0.00322,
+    0.00032
+   ],
+   "tr6_512/Indian_Gooseberry/20250728_165902.jpg": [
+    0.00135,
+    0.00018
+   ],
+   "tr6_512/Indian_Gooseberry/20250731_082535.jpg": [
+    0.00069,
+    4e-05
+   ],
+   "tr6_512/Indian_Gooseberry/20250802_084458.jpg": [
+    0.0026,
+    0.00011
+   ],
+   "tr6_512/Indian_Gooseberry/20250805_122414.jpg": [
+    0.00204,
+    1e-05
+   ],
+   "tr6_512/Indian_Gooseberry/20250807_165534.jpg": [
+    0.01365,
+    0.00016
+   ],
+   "tr6_512/Indian_Gooseberry/20250811_170520.jpg": [
+    0.03894,
+    0.00028
+   ],
+   "tr6_512/Indian_Gooseberry/20250813_165241.jpg": [
+    0.00142,
+    1e-05
+   ],
+   "tr6_512/Indian_Gooseberry/20250818_091314.jpg": [
+    0.00351,
+    2e-05
+   ],
+   "tr6_512/Indian_Gooseberry/20250829_162110.jpg": [
+    0.04873,
+    0.00011
+   ],
+   "tr6_512/Indian_Gooseberry/20250902_125254.jpg": [
+    0.0299,
+    0.00068
+   ],
+   "tr6_512/Indian_Gooseberry/20250908_092533.jpg": [
+    0.29567,
+    0.0775
+   ],
+   "tr6_512/Mango/20250922_133626.jpg": [
+    0.04097,
+    0.66265
+   ],
+   "tr6_512/Mango/20250924_125018.jpg": [
+    0.08837,
+    0.72996
+   ],
+   "tr6_512/Mango/20250930_093758.jpg": [
+    0.10349,
+    0.87258
+   ],
+   "tr6_512/Tomato/20250723_092220.jpg": [
+    0.0,
+    0.99641
+   ],
+   "tr6_512/Tomato/20250725_151526.jpg": [
+    0.0,
+    0.99647
+   ],
+   "tr6_512/Tomato/20250728_131949.jpg": [
+    2e-05,
+    0.99946
+   ],
+   "tr6_512/Tomato/20250730_172314.jpg": [
+    0.0,
+    0.99935
+   ],
+   "tr6_512/Tomato/20250801_170603.jpg": [
+    0.0,
+    0.67791
+   ],
+   "tr6_512/Tomato/20250805_090240.jpg": [
+    0.0,
+    0.9556
+   ],
+   "tr6_512/Tomato/20250807_165629.jpg": [
+    0.0,
+    0.99966
+   ],
+   "tr6_512/Tomato/20250809_165340.jpg": [
+    0.0,
+    0.98975
+   ],
+   "tr6_512/Tomato/20250813_091044.jpg": [
+    1e-05,
+    0.99985
+   ],
+   "tr6_512/Tomato/20250815_092730.jpg": [
+    0.0,
+    0.99826
+   ],
+   "tr6_512/Tomato/20250829_085422.jpg": [
+    0.0,
+    0.99962
+   ],
+   "tr6_512/Tomato/20250901_141222.jpg": [
+    0.0,
+    0.99996
+   ],
+   "tr6_512/Tomato/20250903_164830.jpg": [
+    0.0,
+    0.995
+   ],
+   "tr6_512/Tomato/20250909_135425.jpg": [
+    0.0,
+    0.99996
+   ],
+   "tr6_512/Tomato/20250911_162952.jpg": [
+    0.0,
+    0.99992
+   ],
+   "tr6_512/Tomato/20250915_092410.jpg": [
+    1e-05,
+    0.99991
+   ],
+   "tr6_512/Tomato/20250917_161912.jpg": [
+    1e-05,
+    0.99936
+   ],
+   "tr6_512/Tomato/20250920_084808.jpg": [
+    5e-05,
+    0.99988
+   ],
+   "tr6_512/Tomato/20250923_171428.jpg": [
+    0.0,
+    0.99988
+   ],
+   "tr6_512/Tomato/20250929_091854.jpg": [
+    0.0,
+    0.99998
+   ]
+  },
+  "engines_agree": 5.960464477539063e-08
+ },
+ "seconds": 41.9
+}
