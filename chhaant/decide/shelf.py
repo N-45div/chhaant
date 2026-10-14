@@ -15,8 +15,18 @@ import json
 import numpy as np
 
 from chhaant.decide.forecast import Forecast, ForecastModel, feature_vector
-from chhaant.vision.color import colour_stats, white_balance_from_background
+from chhaant.vision.color import ColourStats, apply_gains, background_gains, colour_stats, item_window
 from chhaant.vision.segment import segment_fruit
+
+COLOUR_ERODE_PX = 3  # colour_stats' default edge trim
+
+
+def colour_reading(bgr: np.ndarray, mask: np.ndarray) -> ColourStats:
+    """``colour_stats(white_balance_from_background(bgr, mask), mask)``, computed on the
+    item's window only: the backdrop sets the gains, but only item pixels are measured."""
+    gains = background_gains(bgr, mask)
+    rows, cols = item_window(mask, COLOUR_ERODE_PX + 1)  # room for the erosion to see the edge
+    return colour_stats(apply_gains(bgr[rows, cols], gains), mask[rows, cols], COLOUR_ERODE_PX)
 
 
 def measure(bgr: np.ndarray, quality_model) -> dict | None:
@@ -24,7 +34,7 @@ def measure(bgr: np.ndarray, quality_model) -> dict | None:
     seg = segment_fruit(bgr)
     if not seg.ok:
         return None
-    st = colour_stats(white_balance_from_background(bgr, seg.mask), seg.mask)
+    st = colour_reading(bgr, seg.mask)
     reading = quality_model.predict(bgr, seg.mask)
     return dict(L=st.L, a=st.a, b=st.b, hue_deg=st.hue_deg, chroma=st.chroma, dark_frac=st.dark_frac,
                 p_ripeness=reading.ripeness, p_defect=reading.defect)
