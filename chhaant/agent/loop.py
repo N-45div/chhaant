@@ -1,5 +1,7 @@
 """The agent loop: the model plans and calls tools; the cell acts and enforces its rules."""
 
+from datetime import date, timedelta
+
 from chhaant.agent.tools import TOOLS, call
 
 SYSTEM = """You run Chhaant, a produce-picking cell: a robot arm, a turntable and a camera over a crate of real produce.
@@ -22,18 +24,27 @@ How to work:
    lines are short, and anything waiting for a person. Never call the order complete while any line is short."""
 
 
+def system_prompt(today: date) -> str:
+    """The rules plus today's date: without it "Saturday" is a guess (one live run read it as 5 days away)."""
+    ahead = ", ".join(f"{today + timedelta(days=n):%A} {n}" for n in range(1, 8))
+    return SYSTEM + f"\n\nToday is {today:%A} {today.day} {today:%B %Y}. Days from today, for eat_in_days: {ahead}."
+
+
 def _tool_result(call_id: str, output: dict) -> dict:
     return {"tool_result": {"id": call_id, "content": output, "error": not output.get("ok", False)}}
 
 
-def run(order_text: str, cell, backend, max_turns: int = 40, nudges: int = 2) -> dict:
+def run(order_text: str, cell, backend, max_turns: int = 40, nudges: int = 2, today: date | None = None) -> dict:
     trace = cell.trace
-    trace.log("start", order=order_text, backend=getattr(backend, "name", "?"), model=getattr(backend, "model_id", getattr(backend, "model", "")))
+    today = today or date.today()
+    system = system_prompt(today)
+    trace.log("start", order=order_text, backend=getattr(backend, "name", "?"),
+              model=getattr(backend, "model_id", getattr(backend, "model", "")), today=today.isoformat())
     messages = [{"role": "user", "content": [{"text": order_text}]}]
     usage = {"input": 0, "output": 0}
     turns = 0
     for turns in range(1, max_turns + 1):
-        reply = backend.chat(SYSTEM, messages, TOOLS)
+        reply = backend.chat(system, messages, TOOLS)
         for k in usage:
             usage[k] += reply.usage.get(k, 0)
         trace.log("model", turn=turns, text=reply.text, tool_calls=[{"name": c.name, "input": c.input} for c in reply.tool_calls],

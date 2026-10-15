@@ -3,7 +3,9 @@ import json
 from chhaant.agent.cell import Cell
 from chhaant.agent.crate import CrateItem
 from chhaant.agent.llm import BedrockBackend, OpenAICompatBackend, Reply, ScriptedBackend, ToolCall
-from chhaant.agent.loop import run
+from datetime import date
+
+from chhaant.agent.loop import run, system_prompt
 from chhaant.agent.tools import TOOLS, call
 
 
@@ -107,3 +109,22 @@ def test_openai_compatible_translation_for_nemotron():
     assert roles == ["system", "user", "assistant", "tool"]
     assert sent["messages"][2]["tool_calls"][0]["function"]["name"] == "list_crate"
     assert sent["tools"][0]["function"]["parameters"]["required"] == ["lines"]
+
+
+def test_the_model_is_told_the_date_so_named_days_resolve():
+    prompt = system_prompt(date(2026, 10, 15))  # a Thursday
+    assert "Today is Thursday 15 October 2026" in prompt
+    assert "Friday 1, Saturday 2, Sunday 3" in prompt and "Thursday 7" in prompt
+
+
+def test_the_run_uses_and_records_the_date():
+    class Recording(ScriptedBackend):
+        def chat(self, system, messages, tools):
+            self.system = system
+            return super().chat(system, messages, tools)
+
+    cell = Cell(crate(), FakeInspectors())
+    backend = Recording([Reply("done", [], "end_turn")])
+    run("One tomato.", cell, backend, nudges=0, today=date(2026, 10, 17))
+    assert "Today is Saturday 17 October 2026" in backend.system
+    assert cell.trace.events[0]["today"] == "2026-10-17"
