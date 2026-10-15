@@ -50,6 +50,7 @@ textarea { width: 100%; font: inherit; color: inherit; background: var(--bg); bo
 .ev.refused { background: var(--bad-bg); border-color: transparent; color: var(--bad); }
 .ev.ask { background: var(--warn-bg); border-color: transparent; }
 .unusable { color: var(--bad); }
+.toggle { display: flex; gap: 8px; align-items: flex-start; margin: 4px 0 14px; font-size: 0.9rem; line-height: 1.35; }
 .ev.action { border-style: dashed; }
 .ev .head { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; font-weight: 600; margin-bottom: 6px; }
 .ev .small { font-size: 13px; color: var(--muted); }

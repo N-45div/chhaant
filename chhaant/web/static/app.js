@@ -144,7 +144,7 @@ function watch(id) {
 async function start() {
   $("#run").disabled = true;
   const reviewer = document.querySelector("input[name=reviewer]:checked").value;
-  const { ok, status, body } = await api("/api/runs", { method: "POST", body: JSON.stringify({ order: $("#order").value, reviewer, seed: 3 }) });
+  const { ok, status, body } = await api("/api/runs", { method: "POST", body: JSON.stringify({ order: $("#order").value, reviewer, seed: 3, faults: $("#faults").checked }) });
   if (ok) return watch(body.id);
   $("#run").disabled = false;
   $("#run-note").textContent = body.error || `could not start (${status})`;
