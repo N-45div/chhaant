@@ -13,13 +13,15 @@
    defect score, and how often it changes the view's call (defect >= 0.7,
    clean < 0.1, else unsure), most of all into "clean".
 
-    python eval/capture_failures.py            # writes eval/results/capture_failures.md (+ .json, _gallery.jpg)
+    python eval/capture_failures.py            # eval/results/capture_failures.md (+ .json, _samples.json.gz, _gallery.jpg)
+    python eval/capture_failures.py --rescore  # new rules on the saved samples, no images needed
 
 It is heavy (each photo is segmented 12 times): run it with deploy/eval_job.sh.
 """
 
 import argparse
 import csv
+import gzip
 import hashlib
 import json
 import os
@@ -152,9 +154,9 @@ def measure(model_path: str, rows: list[dict], workers: int) -> list[dict]:
 def calibrate(samples: list[dict]) -> dict:
     good = [s["metrics"] for s in samples if s["split"] == "calib" and s["condition"] == "clean" and s["metrics"]]
     pct = lambda key, q: float(np.percentile([m[key] for m in good if key in m], q))  # noqa: E731
-    return {"min_edge_sharpness": round(pct("edge_sharpness", 0.5), 4), "min_texture": round(pct("texture", 0.5), 2),
-            "max_glare": round(max(0.02, pct("glare", 99.5)), 4),
-            "min_backdrop_grey": round(pct("backdrop_grey", 0.5), 1), "max_frame_clipped": round(max(0.05, pct("frame_clipped", 99.5)), 4),
+    return {"min_edge_sharpness": round(pct("edge_sharpness", 0.5), 4), "max_glare": round(max(0.02, pct("glare", 99.5)), 4),
+            "min_backdrop_grey": round(pct("backdrop_grey", 0.5), 1),
+            "max_item_clipped": round(max(0.05, pct("item_clipped", 99.5)), 4),
             "max_outline_on_edge": round(max(0.02, pct("outline_on_edge", 99.5)), 4)}
 
 
@@ -251,7 +253,19 @@ def main() -> None:
     ap.add_argument("--per-split", type=int, default=240, help="TR-6 photos per half (avocado: half as many)")
     ap.add_argument("--out", default="eval/results/capture_failures")
     ap.add_argument("--workers", type=int, default=os.cpu_count())
+    ap.add_argument("--rescore", action="store_true", help="re-run calibration and scoring on the saved samples")
     args = ap.parse_args()
+    if args.rescore:
+        with gzip.open(args.out + "_samples.json.gz", "rt") as fh:
+            samples = json.load(fh)
+        t = calibrate(samples)
+        text, summary = report(samples, t)
+        with open(args.out + ".md", "w", encoding="utf-8") as fh:
+            fh.write(text)
+        with open(args.out + ".json", "w") as fh:
+            json.dump(summary, fh, indent=1)
+        print(text)
+        return
     samples = measure(args.model, photos(args.tr6, args.avocado, args.per_split), args.workers)
     model = QualityModel(args.model)  # only now: no OpenCV state in the parent while the pool runs
     t = calibrate(samples)
@@ -260,6 +274,8 @@ def main() -> None:
         fh.write(text)
     with open(args.out + ".json", "w") as fh:
         json.dump(summary, fh, indent=1)
+    with gzip.open(args.out + "_samples.json.gz", "wt") as fh:  # every photo x failure, to re-score rule changes
+        json.dump(samples, fh)
     tomatoes = sorted(os.listdir(os.path.join(args.tr6, "tr6_512", "Tomato")))
     gallery(model, os.path.join(args.tr6, "tr6_512", "Tomato", tomatoes[len(tomatoes) // 2]), t, args.out + "_gallery.jpg")
     print(text)

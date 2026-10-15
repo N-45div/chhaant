@@ -5,22 +5,25 @@ quality model, and that score is noise. So every capture is measured first, at
 the segmentation's 512-px working size (the same numbers for a 512-px replay
 photo and a 12 MP camera frame):
 
-* outline sharpness: the strongest gradients along the item's outline, divided
-  by the item/backdrop contrast; roughly one over the edge width in pixels.
-  Defocus and motion blur widen the edge.
-* surface detail: the variance of the Laplacian inside the item. Blur erases
-  it, but so does a smooth or blackened fruit, so it only decides when the
-  outline is marginal (below twice its threshold). A flag must never turn a
-  dark, rotten item into "bad photo" instead of "defective".
-* glare: the share of item pixels blown out in every channel
-* exposure: the backdrop's median grey level (never the item's: a rotten fruit
-  is dark, and must be called defective, not written off as a bad photo), and
-  the share of the frame clipped
+* blur: outline sharpness, the strongest gradients along the item's outline
+  divided by the item/backdrop contrast (roughly one over the edge width in
+  pixels). Every item has an outline; defocus and motion blur widen it.
+* glare: the share of the item's convex hull blown out in every channel
+* overexposure: the share of item pixels clipped in any channel, which skews
+  its colour. Only the item counts: TR-6's white backdrop is often clipped
+  while the fruit is perfectly exposed.
+* darkness: the backdrop's median grey level
 * framing: the share of the outline lying on the frame's edge (item cut off)
+
+Safety rule: a flag must never turn a dark or smooth rotten item into "bad
+photo" instead of "defective". So exposure is judged on the backdrop, never on
+the item, and surface detail (the variance of the Laplacian inside the item,
+still measured) is not a blur test: blur erases it, but so does a blackened
+fruit. Both rules flagged sharp photos of spoiled fruit in calibration.
 
 Thresholds come from eval/capture_failures.py: the 0.5th/99.5th percentile of
 real TR-6 and avocado photos on a calibration split, then checked on held-out
-photos and on synthetic blur, glare, exposure and framing failures.
+photos and on synthetic blur, glare, exposure, framing and empty-frame failures.
 """
 
 from dataclasses import dataclass, field
@@ -31,8 +34,8 @@ import numpy as np
 from chhaant.vision.segment import WORK_SIDE, segment_fruit
 
 # Calibrated by eval/capture_failures.py (see eval/results/capture_failures.md).
-THRESHOLDS = {"min_edge_sharpness": 0.10, "min_texture": 5.0, "max_glare": 0.08, "min_backdrop_grey": 60.0,
-              "max_frame_clipped": 0.40, "max_outline_on_edge": 0.10}
+THRESHOLDS = {"min_edge_sharpness": 0.1768, "max_glare": 0.02, "min_backdrop_grey": 135.0, "max_item_clipped": 0.10,
+              "max_outline_on_edge": 0.02}
 
 BAND_PX = 8       # half-width of the band searched for the edge: wide enough for a GrabCut-sized mask error
 CLIPPED = 250     # every channel at or above this: blown out
@@ -86,6 +89,7 @@ def capture_metrics(bgr: np.ndarray, mask: np.ndarray) -> dict:
     cv2.fillPoly(hull, [cv2.convexHull(np.vstack(contours))], 255)
     out["glare"] = float(np.mean(work.min(axis=2)[hull > 0] >= CLIPPED))
     out["item_grey"] = float(np.median(gray[item]))
+    out["item_clipped"] = float(np.mean(work.max(axis=2)[item] >= CLIPPED))
     border = np.zeros_like(item)
     border[[0, -1], :] = True
     border[:, [0, -1]] = True
@@ -100,14 +104,12 @@ def judge(m: dict, t: dict = THRESHOLDS) -> list[str]:
     problems = []
     if m.get("edge_sharpness", 1.0) < t["min_edge_sharpness"]:
         problems.append(f"blurred (outline sharpness {m['edge_sharpness']:.3f} < {t['min_edge_sharpness']:.3f})")
-    elif m.get("texture", 1e9) < t["min_texture"] and m.get("edge_sharpness", 1.0) < 2 * t["min_edge_sharpness"]:
-        problems.append(f"blurred (surface detail {m['texture']:.1f} < {t['min_texture']:.1f})")
     if m.get("glare", 0.0) > t["max_glare"]:
         problems.append(f"glare on {m['glare']:.0%} of the item")
+    if m.get("item_clipped", 0.0) > t["max_item_clipped"]:
+        problems.append(f"overexposed ({m['item_clipped']:.0%} of the item clipped)")
     if m.get("backdrop_grey", 255.0) < t["min_backdrop_grey"]:
         problems.append(f"too dark (backdrop grey {m['backdrop_grey']:.0f})")
-    if m.get("frame_clipped", 0.0) > t["max_frame_clipped"]:
-        problems.append(f"overexposed ({m['frame_clipped']:.0%} of the frame clipped)")
     if m.get("outline_on_edge", 0.0) > t["max_outline_on_edge"]:
         problems.append(f"item cut off by the frame edge ({m['outline_on_edge']:.0%} of its outline)")
     return problems
