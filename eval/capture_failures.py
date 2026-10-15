@@ -32,13 +32,13 @@ import cv2
 import numpy as np
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
+from chhaant.robot.faults import FAULTS, degrade  # noqa: E402
 from chhaant.vision.capture import THRESHOLDS, capture_metrics, judge  # noqa: E402
 from chhaant.vision.model import QualityModel  # noqa: E402
 from chhaant.vision.segment import segment_fruit  # noqa: E402
 
 T_DEFECT, T_CLEAN = 0.7, 0.1  # the cell's TR-6 view thresholds
-CONDITIONS = ["clean", "defocus 1.5", "defocus 3", "motion 9", "motion 17", "glare 10%", "glare 20%",
-              "dark x0.2", "bright x3", "empty", "cut off 40%"]
+CONDITIONS = ["clean", *FAULTS]
 EXPECTED = {"defocus": "blurred", "motion": "blurred", "glare": "glare", "dark": ("too dark", "no usable item"),
             "bright": ("overexposed", "glare"), "empty": "no usable item", "cut": "cut off"}
 
@@ -66,46 +66,6 @@ def photos(tr6_root: str, avocado_root: str, per_split: int) -> list[dict]:
             n = per_split if s == "TR-6" else per_split // 2
             picked += pool[::max(1, len(pool) // n)][:n]
     return picked
-
-
-# ---- the failures -------------------------------------------------------------
-def _px(img, v):  # sizes are given at 512 px and scale with the photo
-    return v * max(img.shape[:2]) / 512
-
-
-def degrade(img: np.ndarray, mask: np.ndarray, cond: str) -> np.ndarray:
-    if cond == "clean":
-        return img
-    kind, arg = cond.split(" ")[0], cond.split(" ")[-1]
-    if kind == "defocus":
-        return cv2.GaussianBlur(img, (0, 0), _px(img, float(arg)))
-    if kind == "motion":
-        n = int(round(_px(img, float(arg)))) | 1
-        k = np.zeros((n, n), np.float32)
-        k[n // 2, :] = 1.0 / n
-        return cv2.filter2D(img, -1, k)
-    if kind == "glare":  # a blown-out highlight covering a share of the item
-        x, y, w, h = cv2.boundingRect(mask)
-        b = np.sqrt(float(arg.rstrip("%")) / 100 * np.count_nonzero(mask) / (np.pi * 1.4))
-        spot = np.zeros(mask.shape, np.float32)
-        cv2.ellipse(spot, (int(x + 0.42 * w), int(y + 0.38 * h)), (int(1.4 * b), int(b)), -30, 0, 360, 1.0, -1)
-        alpha = (cv2.GaussianBlur(spot, (0, 0), max(1.0, 0.15 * b)) * (mask > 0))[..., None]
-        return np.clip(img * (1 - alpha) + 255 * np.minimum(1.0, alpha * 1.6), 0, 255).astype(np.uint8)
-    if kind in ("dark", "bright"):
-        return np.clip(img.astype(np.float32) * float(arg.lstrip("x")), 0, 255).astype(np.uint8)
-    if kind == "empty":  # the turntable with nothing on it: backdrop colour and sensor noise where the item was
-        hole = cv2.dilate(mask, cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (31, 31))) > 0
-        out = img.copy()
-        backdrop = np.median(img[~hole], axis=0)
-        noise = np.random.default_rng(0).normal(0, 3, (int(hole.sum()), 3))
-        out[hole] = np.clip(backdrop + noise, 0, 255).astype(np.uint8)
-        return out
-    if kind == "cut":  # slide the item off the right edge until this share of it is outside
-        x, y, w, h = cv2.boundingRect(mask)
-        dx = img.shape[1] - (x + w) + int(float(arg.rstrip("%")) / 100 * w)
-        return cv2.warpAffine(img, np.float32([[1, 0, dx], [0, 1, 0]]), (img.shape[1], img.shape[0]),
-                              borderMode=cv2.BORDER_REPLICATE)
-    raise ValueError(cond)
 
 
 def call(p: float) -> str:
@@ -154,7 +114,7 @@ def measure(model_path: str, rows: list[dict], workers: int) -> list[dict]:
 def calibrate(samples: list[dict]) -> dict:
     good = [s["metrics"] for s in samples if s["split"] == "calib" and s["condition"] == "clean" and s["metrics"]]
     pct = lambda key, q: float(np.percentile([m[key] for m in good if key in m], q))  # noqa: E731
-    return {"min_edge_sharpness": round(pct("edge_sharpness", 0.5), 4), "max_glare": round(max(0.02, pct("glare", 99.5)), 4),
+    return {"min_contrast": round(pct("contrast", 0.5), 1), "min_edge_sharpness": round(pct("edge_sharpness", 0.5), 4), "max_glare": round(max(0.02, pct("glare", 99.5)), 4),
             "min_backdrop_grey": round(pct("backdrop_grey", 0.5), 1),
             "max_item_clipped": round(max(0.05, pct("item_clipped", 99.5)), 4),
             "max_outline_on_edge": round(max(0.02, pct("outline_on_edge", 99.5)), 4)}
