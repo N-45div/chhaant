@@ -8,6 +8,7 @@
   defect model was never validated on.
 """
 
+import copy
 import os
 
 import cv2
@@ -15,6 +16,7 @@ import cv2
 from chhaant.decide.camera import TurntableCamera
 from chhaant.decide.policy import InspectionPolicy, PolicyConfig
 from chhaant.decide.shelf import ShelfLife, measure
+from chhaant.robot.faults import FaultyTurntable, spoil, with_fault
 from chhaant.robot.turntable import VirtualTurntable
 from chhaant.vision.capture import check_capture
 
@@ -28,12 +30,23 @@ class CellInspectors:
         self.tr6_root, self.avocado_root = tr6_root, avocado_root
         self.shelf = shelf
         self.policy = policy
+        self.faults: dict = {}  # item_id -> {angle | "every" | "top" | photo index: fault}; see chhaant.robot.faults
+
+    def with_faults(self, faults: dict) -> "CellInspectors":
+        """The same inspectors, with simulated camera faults for some items (one run's copy)."""
+        out = copy.copy(self)
+        out.faults = faults
+        return out
+
+    def _turntable(self, item):
+        table = VirtualTurntable(item.session, self.tr6_root)
+        return FaultyTurntable(table, self.faults[item.item_id]) if item.item_id in self.faults else table
 
     def inspect(self, item) -> dict:
         return self._tr6(item) if item.kind == "tr6" else self._avocado(item)
 
     def _tr6(self, item) -> dict:
-        camera = TurntableCamera(VirtualTurntable(item.session, self.tr6_root), self.model)
+        camera = TurntableCamera(self._turntable(item), self.model)
         v = InspectionPolicy(self.policy).inspect(camera)
         return {
             "capability": "rotate-until-sure defect inspection (validated on TR-6); no shelf-life number for this produce",
@@ -45,9 +58,13 @@ class CellInspectors:
         }
 
     def _avocado(self, item) -> dict:
-        photos, problems = [], []
-        for rel in item.photos:
+        photos, problems, refs = [], [], []
+        for i, rel in enumerate(item.photos):
             img = cv2.imread(os.path.join(self.avocado_root, rel))
+            fault = self.faults.get(item.item_id, {}).get(i)
+            if img is not None and fault:
+                img = spoil(img, fault)
+            refs.append(with_fault(f"avocado:{rel}", fault))
             check = None if img is None else check_capture(img)
             problems.append("could not read the photo" if img is None else check.summary)
             photos.append(measure(img, self.model) if check is not None and check.ok else None)
@@ -63,14 +80,14 @@ class CellInspectors:
                        if forecast else "no usable photo") + (f"; unusable: {'; '.join(bad)}" if bad else ""),
             "unusable_photos": len(bad),
             # the per-photo model readings feed the forecast but are not shown: they were never validated on avocado
-            "looks": [{"photo": f"avocado:{rel}", "measured": p is not None, **({"problem": pr} if pr else {})}
-                      for rel, p, pr in zip(item.photos, photos, problems)],
+            "looks": [{"photo": ref, "measured": p is not None, **({"problem": pr} if pr else {})}
+                      for ref, p, pr in zip(refs, photos, problems)],
         }
 
     def look(self, item, azimuth: float) -> dict:
         if item.kind != "tr6":
             raise ValueError("only 16-angle items can be turned to a chosen angle")
-        look = TurntableCamera(VirtualTurntable(item.session, self.tr6_root), self.model).look_at(azimuth)
+        look = TurntableCamera(self._turntable(item), self.model).look_at(azimuth)
         return _look(look.azimuth, look.p_defect, look.p_ripeness, look.source, look.problem)
 
 
