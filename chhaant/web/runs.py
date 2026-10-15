@@ -54,9 +54,10 @@ def thumb_ref(item) -> str:
 
 class RunManager:
     def __init__(self, make_cell, make_backend, runs_dir: str, per_ip_per_hour: int = 6,
-                 daily_cap: int = 150, person_timeout_s: float = 300.0, on_finish: list | None = None):
+                 daily_cap: int = 150, person_timeout_s: float = 300.0, on_finish: list | None = None, today=None):
         self.make_cell = make_cell          # (trace, reviewer, seed) -> Cell
         self.make_backend = make_backend    # () -> language-model backend
+        self.today = today                  # () -> the cell's local date, so "Saturday" means this Saturday
         self.runs_dir = runs_dir
         self.per_ip_per_hour, self.daily_cap = per_ip_per_hour, daily_cap
         self.person_timeout_s = person_timeout_s
@@ -100,7 +101,7 @@ class RunManager:
 
     def _go(self, run: Run) -> None:
         try:
-            run.result = run_agent(run.order, run.cell, self.make_backend())
+            run.result = run_agent(run.order, run.cell, self.make_backend(), today=self.today() if self.today else None)
             run.status = "done"
         except Exception as err:  # report the failure in the run instead of losing the thread
             run.status, run.error = "error", f"{type(err).__name__}: {err}"

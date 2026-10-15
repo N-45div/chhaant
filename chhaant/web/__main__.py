@@ -9,9 +9,11 @@ Settings come from the environment:
     NEBIUS_API_KEY, NEBIUS_MODEL   for the Nemotron backend on Nebius Token Factory
     CHHAANT_RUNS_PER_HOUR, CHHAANT_DAILY_RUNS, HOST, PORT
     CHHAANT_EVIDENCE_BUCKET        if set, each run's trace goes to S3 and metrics to CloudWatch
+    CHHAANT_UTC_OFFSET_H           the cell's time zone, for the date the agent is told (default 5.5, India)
 """
 
 import os
+from datetime import datetime, timedelta, timezone
 from functools import lru_cache
 
 import uvicorn
@@ -79,9 +81,11 @@ def build_app():
     if env("CHHAANT_EVIDENCE_BUCKET"):
         from chhaant.web.aws import AwsReporter
         hooks.append(AwsReporter(env("CHHAANT_EVIDENCE_BUCKET"), env("AWS_REGION", "ap-south-1")))
+    # A fixed offset, not a zone name: India keeps no daylight saving, and Windows has no tz database.
+    cell_tz = timezone(timedelta(hours=float(env("CHHAANT_UTC_OFFSET_H", "5.5"))))
     manager = RunManager(make_cell, make_backend, env("CHHAANT_RUNS", "data/runs"),
                          per_ip_per_hour=int(env("CHHAANT_RUNS_PER_HOUR", "6")), daily_cap=int(env("CHHAANT_DAILY_RUNS", "150")),
-                         on_finish=hooks)
+                         on_finish=hooks, today=lambda: datetime.now(cell_tz).date())
     return create_app(manager, {"tr6": tr6, "avocado": avocado}, lambda seed: list(crate(seed)), label, sim_meshes)
 
 
