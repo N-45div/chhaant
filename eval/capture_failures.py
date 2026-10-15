@@ -114,7 +114,9 @@ def measure(model_path: str, rows: list[dict], workers: int) -> list[dict]:
 def calibrate(samples: list[dict]) -> dict:
     good = [s["metrics"] for s in samples if s["split"] == "calib" and s["condition"] == "clean" and s["metrics"]]
     pct = lambda key, q: float(np.percentile([m[key] for m in good if key in m], q))  # noqa: E731
-    return {"min_contrast": round(pct("contrast", 0.5), 1), "min_edge_sharpness": round(pct("edge_sharpness", 0.5), 4), "max_glare": round(max(0.02, pct("glare", 99.5)), 4),
+    # Presence must never reject a real, pale fruit: its bar sits well under the palest good photos
+    # (an empty turntable's leftover shadow measures about 10).
+    return {"min_contrast": round(0.6 * pct("contrast", 0.5), 1), "min_edge_sharpness": round(pct("edge_sharpness", 0.5), 4), "max_glare": round(max(0.02, pct("glare", 99.5)), 4),
             "min_backdrop_grey": round(pct("backdrop_grey", 0.5), 1),
             "max_item_clipped": round(max(0.05, pct("item_clipped", 99.5)), 4),
             "max_outline_on_edge": round(max(0.02, pct("outline_on_edge", 99.5)), 4)}
