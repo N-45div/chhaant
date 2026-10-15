@@ -52,11 +52,14 @@ function renderToolResult(tool, input, out) {
   return null;
 }
 
+// A photo that failed the capture checks was never scored: say why instead of showing a number.
+const unusable = (l) => (l.problem ? `<br><span class="unusable">not used: ${esc(l.problem)}</span>` : "");
+
 async function fillViews(itemId, box) {
   const { body } = await api(`/api/runs/${runId}/items/${itemId}`);
   const looks = body.inspection?.looks || [];
   box.innerHTML = looks.map((l) => `<div class="view"><img src="${photo(l.photo, 152)}" alt="view of ${esc(itemId)}">
-    ${angle(l)}${l.defect != null ? `<br>defect ${l.defect}` : ""}${l.ripeness != null ? `<br>ripe ${l.ripeness}` : ""}</div>`).join("");
+    ${angle(l)}${l.defect != null ? `<br>defect ${l.defect}` : ""}${l.ripeness != null ? `<br>ripe ${l.ripeness}` : ""}${unusable(l)}</div>`).join("");
 }
 
 function renderEvent(e) {
@@ -159,7 +162,7 @@ async function openEvidence(itemId) {
       <span>Verdict</span><span>${ins ? `<span class="pill ${esc(ins.verdict)}">${esc(ins.verdict)}</span> ${esc(ins.reason)}` : "not inspected"}</span>
       <span>Measured</span><span>${ins ? esc(ins.capability) : ""}</span>
       <span>Shelf life</span><span>${ins ? esc(fmtForecast(ins.forecast)) : ""} at ${body.storage_temp_c} °C</span></div>
-    <h3>Every photo it used</h3><div class="views">${looks.map((l) => `<div class="view"><img src="${photo(l.photo, 152)}" alt="">${angle(l)}${l.defect != null ? `<br>defect ${l.defect}` : ""}${l.ripeness != null ? `<br>ripe ${l.ripeness}` : ""}${l.why ? `<br><i>${esc(l.why)}</i>` : ""}</div>`).join("")}</div>
+    <h3>Every photo it used</h3><div class="views">${looks.map((l) => `<div class="view"><img src="${photo(l.photo, 152)}" alt="">${angle(l)}${l.defect != null ? `<br>defect ${l.defect}` : ""}${l.ripeness != null ? `<br>ripe ${l.ripeness}` : ""}${unusable(l)}${l.why ? `<br><i>${esc(l.why)}</i>` : ""}</div>`).join("")}</div>
     <h3>Questions to a person</h3>${body.requests.map((r) => `<div class="small">${esc(r.id)} ${esc(r.kind)}: ${esc(r.question)} → <b>${esc(r.status)}</b> ${esc(r.answer)} ${r.by ? `(${esc(r.by)})` : ""}</div>`).join("") || `<div class="small muted">none</div>`}
     <h3>Moves</h3>${body.actions.map((a) => `<div class="small">${a.kind === "guardrail" ? `refused: ${esc(a.refused)}` : `${esc(a.destination)}${a.order_line ? ` line ${a.order_line}` : ""}: ${esc(a.reason)}`}</div>`).join("") || `<div class="small muted">none</div>`}`;
   $("#evidence").showModal();

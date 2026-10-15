@@ -49,6 +49,7 @@ textarea { width: 100%; font: inherit; color: inherit; background: var(--bg); bo
 .ev.model { background: var(--chip); border-color: transparent; white-space: pre-wrap; }
 .ev.refused { background: var(--bad-bg); border-color: transparent; color: var(--bad); }
 .ev.ask { background: var(--warn-bg); border-color: transparent; }
+.unusable { color: var(--bad); }
 .ev.action { border-style: dashed; }
 .ev .head { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; font-weight: 600; margin-bottom: 6px; }
 .ev .small { font-size: 13px; color: var(--muted); }
