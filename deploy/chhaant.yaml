@@ -28,6 +28,13 @@ Parameters:
   BedrockModel:
     Type: String
     Default: global.anthropic.claude-haiku-4-5-20251001-v1:0
+  AlertEmail:
+    Type: String
+    Default: ""
+    Description: Optional. The alarms email this address (it must confirm the subscription once).
+
+Conditions:
+  HasAlertEmail: !Not [!Equals [!Ref AlertEmail, ""]]
 
 Resources:
   Role:
@@ -150,9 +157,117 @@ Resources:
             CachePolicyId: 4cc15a8a-d715-48a4-82b8-cc0b614638fe
             OriginRequestPolicyId: b689b0a8-53d0-40ab-baf2-68738e2966ac
 
+  # ---- observability ---------------------------------------------------------
+  # The app publishes per-run metrics to the Chhaant namespace (chhaant/web/aws.py);
+  # health metrics also go out without a dimension so one alarm covers every run.
+  AlertTopic:
+    Type: AWS::SNS::Topic
+    Properties:
+      DisplayName: Chhaant alarms
+
+  AlertSubscription:
+    Type: AWS::SNS::Subscription
+    Condition: HasAlertEmail
+    Properties:
+      TopicArn: !Ref AlertTopic
+      Protocol: email
+      Endpoint: !Ref AlertEmail
+
+  RunFailedAlarm:
+    Type: AWS::CloudWatch::Alarm
+    Properties:
+      AlarmDescription: A run ended in an error (model call, vision or the cell itself); see runs/<id>/ in S3.
+      Namespace: Chhaant
+      MetricName: RunFailed
+      Statistic: Sum
+      Period: 3600
+      EvaluationPeriods: 1
+      Threshold: 1
+      ComparisonOperator: GreaterThanOrEqualToThreshold
+      TreatMissingData: notBreaching
+      AlarmActions: [!Ref AlertTopic]
+
+  UnusablePhotosAlarm:
+    Type: AWS::CloudWatch::Alarm
+    Properties:
+      AlarmDescription: >
+        Runs average 3+ photos that failed the capture checks (blur, glare, exposure, empty
+        turntable): the camera or the lighting needs a look. Good photos fail about 1% of the time.
+      Namespace: Chhaant
+      MetricName: UnusablePhotos
+      Statistic: Average
+      Period: 3600
+      EvaluationPeriods: 1
+      Threshold: 3
+      ComparisonOperator: GreaterThanOrEqualToThreshold
+      TreatMissingData: notBreaching
+      AlarmActions: [!Ref AlertTopic]
+
+  InstanceStatusAlarm:
+    Type: AWS::CloudWatch::Alarm
+    Properties:
+      AlarmDescription: The instance failed a status check; the page is probably down.
+      Namespace: AWS/EC2
+      MetricName: StatusCheckFailed
+      Dimensions: [{Name: InstanceId, Value: !Ref Instance}]
+      Statistic: Maximum
+      Period: 60
+      EvaluationPeriods: 3
+      Threshold: 1
+      ComparisonOperator: GreaterThanOrEqualToThreshold
+      AlarmActions: [!Ref AlertTopic]
+
+  InstanceRecoveryAlarm:
+    Type: AWS::CloudWatch::Alarm
+    Properties:
+      AlarmDescription: The AWS host under the instance failed; EC2 moves it to healthy hardware (same IP and volume).
+      Namespace: AWS/EC2
+      MetricName: StatusCheckFailed_System
+      Dimensions: [{Name: InstanceId, Value: !Ref Instance}]
+      Statistic: Maximum
+      Period: 60
+      EvaluationPeriods: 2
+      Threshold: 1
+      ComparisonOperator: GreaterThanOrEqualToThreshold
+      AlarmActions: [!Sub "arn:aws:automate:${AWS::Region}:ec2:recover", !Ref AlertTopic]
+
+  Dashboard:
+    Type: AWS::CloudWatch::Dashboard
+    Properties:
+      DashboardName: Chhaant
+      DashboardBody: !Sub |
+        {"widgets": [
+          {"type": "metric", "x": 0, "y": 0, "width": 8, "height": 6, "properties": {
+            "title": "Runs and failures (per hour)", "region": "${AWS::Region}", "stat": "Sum", "period": 3600, "view": "timeSeries",
+            "metrics": [["Chhaant", "RunSeconds", {"stat": "SampleCount", "label": "runs"}], [".", "RunFailed", {"label": "failed runs"}]]}},
+          {"type": "metric", "x": 8, "y": 0, "width": 8, "height": 6, "properties": {
+            "title": "Run time (s)", "region": "${AWS::Region}", "period": 3600, "view": "timeSeries",
+            "metrics": [["Chhaant", "RunSeconds", {"stat": "Average", "label": "average"}], ["...", {"stat": "p90", "label": "p90"}]]}},
+          {"type": "alarm", "x": 16, "y": 0, "width": 8, "height": 6, "properties": {
+            "title": "Alarms", "alarms": ["${RunFailedAlarm.Arn}", "${UnusablePhotosAlarm.Arn}", "${InstanceStatusAlarm.Arn}", "${InstanceRecoveryAlarm.Arn}"]}},
+          {"type": "metric", "x": 0, "y": 6, "width": 8, "height": 6, "properties": {
+            "title": "Cell rules at work (average per run)", "region": "${AWS::Region}", "stat": "Average", "period": 3600, "view": "timeSeries",
+            "metrics": [["Chhaant", "RefusedMoves", {"label": "moves the cell refused"}], [".", "UnusablePhotos", {"label": "photos failing capture checks"}],
+                        [".", "PersonRequests", "Reviewer", "person", {"label": "questions to a person"}],
+                        ["...", "simulated", {"label": "questions to the simulated reviewer"}]]}},
+          {"type": "metric", "x": 8, "y": 6, "width": 8, "height": 6, "properties": {
+            "title": "Packed wrong vs the hidden labels (simulated reviewer runs)", "region": "${AWS::Region}", "stat": "Sum", "period": 3600, "view": "timeSeries",
+            "metrics": [["Chhaant", "PackedWrong", "Reviewer", "simulated"], [".", "ItemsInspected", ".", ".", {"label": "items inspected"}]]}},
+          {"type": "metric", "x": 16, "y": 6, "width": 8, "height": 6, "properties": {
+            "title": "Language-model tokens (per hour)", "region": "${AWS::Region}", "stat": "Sum", "period": 3600, "view": "timeSeries",
+            "metrics": [["Chhaant", "InputTokens", "Reviewer", "person"], ["...", "simulated"],
+                        [".", "OutputTokens", ".", "person"], ["...", "simulated"]]}},
+          {"type": "metric", "x": 0, "y": 12, "width": 12, "height": 6, "properties": {
+            "title": "Instance CPU (%) and status", "region": "${AWS::Region}", "period": 300, "view": "timeSeries",
+            "metrics": [["AWS/EC2", "CPUUtilization", "InstanceId", "${Instance}", {"stat": "Average"}],
+                        [".", "StatusCheckFailed", ".", ".", {"stat": "Maximum", "yAxis": "right"}]]}}
+        ]}
+
 Outputs:
   Url:
     Value: !Sub https://${Distribution.DomainName}
+  DashboardUrl:
+    Value: !Sub https://${AWS::Region}.console.aws.amazon.com/cloudwatch/home?region=${AWS::Region}#dashboards:name=Chhaant
   InstanceId:
     Value: !Ref Instance
   OriginAddress:
