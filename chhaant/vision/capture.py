@@ -14,6 +14,9 @@ photo and a 12 MP camera frame):
   while the fruit is perfectly exposed.
 * darkness: the backdrop's median grey level
 * framing: the share of the outline lying on the frame's edge (item cut off)
+* presence: the item's grey-level contrast with the backdrop; a shadow left on
+  an empty turntable is faint, any real fruit (dark rotten ones most of all)
+  stands out
 
 Safety rule: a flag must never turn a dark or smooth rotten item into "bad
 photo" instead of "defective". So exposure is judged on the backdrop, never on
@@ -34,7 +37,7 @@ import numpy as np
 from chhaant.vision.segment import WORK_SIDE, segment_fruit
 
 # Calibrated by eval/capture_failures.py (see eval/results/capture_failures.md).
-THRESHOLDS = {"min_edge_sharpness": 0.1768, "max_glare": 0.02, "min_backdrop_grey": 135.0, "max_item_clipped": 0.10,
+THRESHOLDS = {"min_contrast": 20.0, "min_edge_sharpness": 0.1768, "max_glare": 0.02, "min_backdrop_grey": 135.0, "max_item_clipped": 0.05,
               "max_outline_on_edge": 0.02}
 
 BAND_PX = 8       # half-width of the band searched for the edge: wide enough for a GrabCut-sized mask error
@@ -101,17 +104,20 @@ def capture_metrics(bgr: np.ndarray, mask: np.ndarray) -> dict:
 
 def judge(m: dict, t: dict = THRESHOLDS) -> list[str]:
     """Every reason the measured photo cannot count as evidence (empty when it can)."""
-    problems = []
-    if m.get("edge_sharpness", 1.0) < t["min_edge_sharpness"]:
-        problems.append(f"blurred (outline sharpness {m['edge_sharpness']:.3f} < {t['min_edge_sharpness']:.3f})")
-    if m.get("glare", 0.0) > t["max_glare"]:
-        problems.append(f"glare on {m['glare']:.0%} of the item")
-    if m.get("item_clipped", 0.0) > t["max_item_clipped"]:
-        problems.append(f"overexposed ({m['item_clipped']:.0%} of the item clipped)")
+    problems = []  # causes first: an over- or under-exposed photo also loses its sharp outline
+    if m.get("contrast", 255.0) < t["min_contrast"]:
+        return [f"no usable item: nothing stands out clearly (contrast {m['contrast']:.0f})"]
     if m.get("backdrop_grey", 255.0) < t["min_backdrop_grey"]:
         problems.append(f"too dark (backdrop grey {m['backdrop_grey']:.0f})")
+    if m.get("glare", 0.0) > t["max_glare"]:
+        problems.append(f"glare on {m['glare']:.0%} of the item")
+    # Glare clips every channel too; overexposure is the clipping that glare does not explain.
+    if m.get("item_clipped", 0.0) - max(m.get("glare", 0.0), 0.0) > t["max_item_clipped"]:
+        problems.append(f"overexposed ({m['item_clipped']:.0%} of the item clipped)")
     if m.get("outline_on_edge", 0.0) > t["max_outline_on_edge"]:
         problems.append(f"item cut off by the frame edge ({m['outline_on_edge']:.0%} of its outline)")
+    if m.get("edge_sharpness", 1.0) < t["min_edge_sharpness"]:
+        problems.append(f"blurred (outline sharpness {m['edge_sharpness']:.3f} < {t['min_edge_sharpness']:.3f})")
     return problems
 
 

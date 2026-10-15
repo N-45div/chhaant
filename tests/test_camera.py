@@ -35,7 +35,7 @@ def make_session(tmp_path, colours):
 
 
 def test_policy_drives_the_turntable_and_reads_real_pixels(tmp_path):
-    bright = (200, 210, 230)
+    bright = (140, 170, 205)  # stands out from the backdrop as much as real fruit (>= 33 grey levels)
     session = make_session(tmp_path, [bright] * 17)
     table = VirtualTurntable(session, str(tmp_path))
     verdict = InspectionPolicy().inspect(TurntableCamera(table, BrightnessModel()))
@@ -45,7 +45,7 @@ def test_policy_drives_the_turntable_and_reads_real_pixels(tmp_path):
 
 
 def test_dark_side_is_found_and_confirmed(tmp_path):
-    bright, rotten = (200, 210, 230), (20, 25, 30)
+    bright, rotten = (140, 170, 205), (20, 25, 30)
     colours = [bright] * 17
     for side in (7, 8, 9, 10):  # files 8-11 = side views at 157.5-225 degrees
         colours[side + 1] = rotten
