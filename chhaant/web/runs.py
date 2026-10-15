@@ -42,6 +42,7 @@ class Run:
     result: dict | None = None
     error: str = ""
     finished_at: float | None = None
+    faults: bool = False      # simulated camera faults (chhaant.robot.faults.DEMO_FAULTS)
 
 
 def _forecast(f) -> dict | None:
@@ -84,7 +85,7 @@ class RunManager:
         hits.append(now)
         self._day_count += 1
 
-    def start(self, order: str, reviewer_mode: str, ip: str, seed: int = 3) -> Run:
+    def start(self, order: str, reviewer_mode: str, ip: str, seed: int = 3, faults: bool = False) -> Run:
         if reviewer_mode not in ("person", "simulated"):
             raise ValueError("reviewer must be 'person' or 'simulated'")
         with self._lock:
@@ -94,7 +95,8 @@ class RunManager:
             run_id = time.strftime("%Y%m%d-%H%M%S-") + uuid.uuid4().hex[:6]
             trace = Trace(os.path.join(self.runs_dir, run_id, "trace.jsonl"))
             reviewer = PersonReviewer(self.person_timeout_s) if reviewer_mode == "person" else SimulatedReviewer()
-            run = Run(run_id, order, reviewer_mode, seed, self.make_cell(trace, reviewer, seed), reviewer, time.time())
+            run = Run(run_id, order, reviewer_mode, seed, self.make_cell(trace, reviewer, seed, faults), reviewer,
+                      time.time(), faults=faults)
             self.runs[run_id], self.active = run, run_id
         threading.Thread(target=self._go, args=(run,), daemon=True).start()
         return run
@@ -110,7 +112,8 @@ class RunManager:
             run.finished_at = time.time()
             with open(os.path.join(self.runs_dir, run.id, "result.json"), "w") as fh:
                 json.dump({"order": run.order, "status": run.status, "error": run.error, "result": run.result,
-                           "reviewer": run.reviewer_mode, "seed": run.seed}, fh, indent=1, default=str)
+                           "reviewer": run.reviewer_mode, "seed": run.seed, "camera_faults": run.faults},
+                          fh, indent=1, default=str)
             for hook in self.on_finish:
                 try:
                     hook(run, self.runs_dir)
@@ -142,7 +145,7 @@ class RunManager:
             "waiting": [{"request_id": r.id, "item_id": r.item_id, "kind": r.kind, "question": r.question}
                         for r in cell.queue.requests if r.id in waiting],
             "events": events[after:], "next": len(events),
-            "result": run.result, "sim": getattr(cell, "twin", None) is not None,
+            "result": run.result, "sim": getattr(cell, "twin", None) is not None, "camera_faults": run.faults,
         }
 
     def _item_row(self, cell, item_id: str) -> dict:

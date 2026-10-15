@@ -48,7 +48,7 @@ def client(tmp_path):
     (tmp_path / "tr6" / "tr6_512" / "Tomato").mkdir(parents=True)
     cv2.imwrite(str(tmp_path / "tr6" / "tr6_512" / "Tomato" / "a.jpg"), img)
     (tmp_path / "secret.txt").write_text("not for you")
-    manager = RunManager(lambda trace, reviewer, seed: Cell(crate(seed), FakeInspectors(), trace=trace, reviewer=reviewer),
+    manager = RunManager(lambda trace, reviewer, seed, faults=False: Cell(crate(seed), FakeInspectors(), trace=trace, reviewer=reviewer),
                          lambda: ScriptedBackend(script()), str(tmp_path / "runs"), per_ip_per_hour=3, person_timeout_s=5)
     app = create_app(manager, {"tr6": str(tmp_path / "tr6"), "avocado": str(tmp_path / "avo")}, crate, "scripted")
     return TestClient(app), manager
@@ -115,6 +115,15 @@ def test_photos_only_from_the_data_folders(client):
     ok = c.get("/api/photo", params={"ref": "tr6:tr6_512/Tomato/a.jpg", "w": 20})
     assert ok.status_code == 200 and ok.headers["content-type"] == "image/jpeg"
     for ref in ("tr6:../secret.txt", "tr6:../../secret.txt", "etc:passwd", "tr6:", "avocado:a.jpg"):
+        assert c.get("/api/photo", params={"ref": ref}).status_code == 404
+
+
+def test_photo_with_a_simulated_fault_shows_the_spoiled_pixels(client):
+    c, _ = client
+    plain = c.get("/api/photo", params={"ref": "tr6:tr6_512/Tomato/a.jpg"})
+    dark = c.get("/api/photo", params={"ref": "tr6:tr6_512/Tomato/a.jpg#dark x0.2"})
+    assert dark.status_code == 200 and dark.content != plain.content
+    for ref in ("tr6:tr6_512/Tomato/a.jpg#rm -rf", "tr6:../secret.txt#dark x0.2"):
         assert c.get("/api/photo", params={"ref": ref}).status_code == 404
 
 

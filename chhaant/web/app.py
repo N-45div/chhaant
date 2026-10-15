@@ -25,6 +25,7 @@ from fastapi.responses import FileResponse, JSONResponse, Response
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 
+from chhaant.robot.faults import split_ref, spoil
 from chhaant.web.runs import Busy, RateLimited, RunManager, thumb_ref
 
 STATIC = os.path.join(os.path.dirname(os.path.abspath(__file__)), "static")
@@ -35,6 +36,7 @@ class StartRun(BaseModel):
     order: str = Field(min_length=3, max_length=600)
     reviewer: str = "person"
     seed: int = Field(default=3, ge=0, le=999)
+    faults: bool = False  # spoil some photos (chhaant.robot.faults.DEMO_FAULTS) to show how the cell copes
 
 
 class Answer(BaseModel):
@@ -67,10 +69,12 @@ def create_app(manager: RunManager, photo_roots: dict[str, str], crate_preview, 
     app.mount("/static", StaticFiles(directory=STATIC), name="static")
 
     @lru_cache(maxsize=512)
-    def photo_bytes(path: str, width: int) -> bytes:
+    def photo_bytes(path: str, width: int, fault: str | None = None) -> bytes:
         img = cv2.imread(path)
         if img is None:
             raise HTTPException(404, "unreadable photo")
+        if fault:  # the degraded pixels the cell was given in a camera-faults run
+            img = spoil(img, fault)
         if width and img.shape[1] > width:
             img = cv2.resize(img, (width, round(img.shape[0] * width / img.shape[1])), interpolation=cv2.INTER_AREA)
         ok, enc = cv2.imencode(".jpg", img, [cv2.IMWRITE_JPEG_QUALITY, 85])
@@ -96,7 +100,7 @@ def create_app(manager: RunManager, photo_roots: dict[str, str], crate_preview, 
     @app.post("/api/runs", status_code=202)
     def start(body: StartRun, request: Request):
         try:
-            run = manager.start(body.order, body.reviewer, client_ip(request), body.seed)
+            run = manager.start(body.order, body.reviewer, client_ip(request), body.seed, body.faults)
         except Busy as busy:
             return JSONResponse({"error": "a run is in progress; watch it", "active": busy.active_id}, status_code=409)
         except RateLimited as limited:
@@ -154,8 +158,12 @@ def create_app(manager: RunManager, photo_roots: dict[str, str], crate_preview, 
 
     @app.get("/api/photo")
     def photo(ref: str, w: int = 0):
+        try:
+            ref, fault = split_ref(ref)
+        except ValueError:
+            raise HTTPException(404, "unknown photo")
         path = safe_photo_path(ref, photo_roots)
-        return Response(photo_bytes(path, max(0, min(w, 1024))), media_type="image/jpeg",
+        return Response(photo_bytes(path, max(0, min(w, 1024)), fault), media_type="image/jpeg",
                         headers={"Cache-Control": "public, max-age=86400"})
 
     return app

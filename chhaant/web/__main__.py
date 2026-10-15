@@ -23,6 +23,7 @@ from chhaant.agent.crate import avocado_items, tr6_items
 from chhaant.agent.inspectors import CellInspectors
 from chhaant.agent.llm import BedrockBackend, OpenAICompatBackend
 from chhaant.decide.shelf import ShelfLife
+from chhaant.robot.faults import DEMO_FAULTS
 from chhaant.vision.model import QualityModel
 from chhaant.web.app import create_app
 from chhaant.web.runs import RunManager
@@ -48,12 +49,13 @@ def build_app():
     except Exception:
         SimTwin = None
 
-    def make_cell(trace, reviewer, seed):
+    def make_cell(trace, reviewer, seed, faults=False):
         items = list(crate(seed))
+        insp = inspectors.with_faults(DEMO_FAULTS) if faults else inspectors
         if SimTwin is None:
-            return Cell(items, inspectors, trace=trace, reviewer=reviewer)
+            return Cell(items, insp, trace=trace, reviewer=reviewer)
         twin = SimTwin([(i.item_id, i.produce) for i in items])
-        cell = Cell(items, TwinInspectors(inspectors, twin), trace=trace, reviewer=reviewer, actuator=TwinActuator(twin))
+        cell = Cell(items, TwinInspectors(insp, twin), trace=trace, reviewer=reviewer, actuator=TwinActuator(twin))
         cell.twin = twin
         return cell
 
