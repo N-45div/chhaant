@@ -50,3 +50,17 @@ def test_a_failed_upload_never_breaks_the_run(tmp_path):
     cw = StubCloudWatch()
     AwsReporter("b", "ap-south-1", s3=StubS3(fail=True), cloudwatch=cw)(run(tmp_path), str(tmp_path))
     assert cw.calls  # metrics still published
+
+
+def test_a_camera_faults_demo_never_feeds_the_camera_alarm(tmp_path):
+    cw = StubCloudWatch()
+    r = run(tmp_path)
+    r.result["score"]["unusable_photos"] = 5
+    alarm_feed = lambda calls: [m for m in calls[-1][1] if m["MetricName"] == "UnusablePhotos" and "Dimensions" not in m]  # noqa: E731
+    AwsReporter("bucket", "ap-south-1", s3=StubS3(), cloudwatch=cw)(r, str(tmp_path))
+    assert alarm_feed(cw.calls)[0]["Value"] == 5.0
+    r.faults = True
+    AwsReporter("bucket", "ap-south-1", s3=StubS3(), cloudwatch=cw)(r, str(tmp_path))
+    assert alarm_feed(cw.calls) == []
+    assert any(m["MetricName"] == "UnusablePhotos" and "Dimensions" in m for m in cw.calls[-1][1])  # still on the dashboard
+

@@ -6,7 +6,8 @@ cell: how long runs take, how often the cell refused a move, how often the
 agent asked a person, how many photos failed the capture checks, and, for
 simulated-reviewer runs, how many items were packed wrong against the hidden
 labels. The health metrics are also published without a dimension, so one
-alarm covers every run.
+alarm covers every run; a camera-faults demo run (photos spoiled on purpose)
+leaves UnusablePhotos out of that copy, so a visitor's demo never pages anyone.
 """
 
 import logging
@@ -54,5 +55,5 @@ class AwsReporter:
             values["PackedWrong"] = score.get("packed_bad", 0)
         unit = {"RunSeconds": "Seconds"}
         data = [{"MetricName": k, "Value": float(v), "Unit": unit.get(k, "Count"), "Dimensions": dims} for k, v in values.items()]
-        return data + [{"MetricName": k, "Value": float(values[k]), "Unit": unit.get(k, "Count")}
-                       for k in ("RunSeconds", "RunFailed", "RefusedMoves", "UnusablePhotos")]
+        health = ["RunSeconds", "RunFailed", "RefusedMoves"] + ([] if getattr(run, "faults", False) else ["UnusablePhotos"])
+        return data + [{"MetricName": k, "Value": float(values[k]), "Unit": unit.get(k, "Count")} for k in health]
