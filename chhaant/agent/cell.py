@@ -166,7 +166,8 @@ class Cell:
                 "capability": insp["capability"], "verdict": insp["verdict"], "reason": insp["reason"],
                 "defect_score": insp.get("defect_score"), "ripeness": insp.get("ripeness"),
                 "coverage": insp.get("coverage"), "unseen_share": insp.get("unseen_share"),
-                "views_used": insp.get("side_views"), "forecast_days_left": _forecast(insp["forecast"]),
+                "views_used": insp.get("side_views"), "unusable_photos": insp.get("unusable_photos", 0),
+                "forecast_days_left": _forecast(insp["forecast"]),
                 "storage_temp_c": self.items[item_id].temp_c, "routing_for_open_lines": self._routings(item_id)}
 
     def look_closer(self, item_id: str, azimuth: float) -> dict:

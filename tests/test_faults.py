@@ -34,3 +34,23 @@ def test_fault_references_accept_only_known_faults():
     assert all(split_ref(with_fault("x:y.jpg", f))[1] == f for f in FAULTS)
     with pytest.raises(ValueError):
         split_ref("tr6:a.jpg#../../etc/passwd")
+
+
+def test_the_agent_sees_how_many_photos_were_unusable(tmp_path):
+    from chhaant.agent.cell import Cell
+    from chhaant.agent.crate import CrateItem
+    from test_camera import make_session as session_of
+
+    class Inspectors:  # the real inspection path, glare at every angle
+        def inspect(self, item):
+            table = FaultyTurntable(VirtualTurntable(session_of(tmp_path, [(60, 90, 200)] * 17), str(tmp_path)),
+                                    {"every": "glare 20%"})
+            v = InspectionPolicy().inspect(TurntableCamera(table, BrightnessModel()))
+            return {"capability": "test", "verdict": v.decision, "reason": v.reason, "forecast": None,
+                    "unusable_photos": sum(1 for s in v.steps if s.problem), "looks": []}
+
+    cell = Cell([CrateItem("T1", "Tomato", "tr6", 30.0, truth={"defective": False})], Inspectors())
+    out = cell.inspect("T1")
+    assert out["verdict"] == "escalate" and out["unusable_photos"] == 3
+    assert cell.score()["unusable_photos"] == 3
+
