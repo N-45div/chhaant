@@ -1,0 +1,104 @@
+{
+ "thresholds": {
+  "min_contrast": 27.4,
+  "min_edge_sharpness": 0.1768,
+  "max_glare": 0.02,
+  "min_backdrop_grey": 135.0,
+  "max_item_clipped": 0.05,
+  "max_outline_on_edge": 0.02
+ },
+ "conditions": {
+  "clean": {
+   "photos": 360,
+   "flagged": 0.008333333333333333,
+   "right_reason": 0.0,
+   "median_shift": 0.0,
+   "call_changed": 0.0,
+   "moved_to_clean": 0.0
+  },
+  "defocus 1.5": {
+   "photos": 360,
+   "flagged": 0.4222222222222222,
+   "right_reason": 0.4222222222222222,
+   "median_shift": 0.00756097261182731,
+   "call_changed": 0.26666666666666666,
+   "moved_to_clean": 0.20555555555555555
+  },
+  "defocus 3": {
+   "photos": 360,
+   "flagged": 0.9555555555555556,
+   "right_reason": 0.9555555555555556,
+   "median_shift": 0.01225652949506184,
+   "call_changed": 0.2833333333333333,
+   "moved_to_clean": 0.22777777777777777
+  },
+  "motion 9": {
+   "photos": 360,
+   "flagged": 0.3055555555555556,
+   "right_reason": 0.3055555555555556,
+   "median_shift": 0.013318024575710297,
+   "call_changed": 0.25,
+   "moved_to_clean": 0.12222222222222222
+  },
+  "motion 17": {
+   "photos": 360,
+   "flagged": 0.8444444444444444,
+   "right_reason": 0.8444444444444444,
+   "median_shift": 0.016972590528894216,
+   "call_changed": 0.32222222222222224,
+   "moved_to_clean": 0.2111111111111111
+  },
+  "glare 10%": {
+   "photos": 360,
+   "flagged": 0.9888888888888889,
+   "right_reason": 0.9888888888888889,
+   "median_shift": 0.008768060932197841,
+   "call_changed": 0.19444444444444445,
+   "moved_to_clean": 0.10555555555555556
+  },
+  "glare 20%": {
+   "photos": 360,
+   "flagged": 0.9944444444444445,
+   "right_reason": 0.9944444444444445,
+   "median_shift": 0.008884433214916498,
+   "call_changed": 0.2361111111111111,
+   "moved_to_clean": 0.1111111111111111
+  },
+  "dark x0.2": {
+   "photos": 360,
+   "flagged": 1.0,
+   "right_reason": 1.0,
+   "median_shift": 0.3421127120827805,
+   "call_changed": 0.6888888888888889,
+   "moved_to_clean": 0.175
+  },
+  "bright x3": {
+   "photos": 360,
+   "flagged": 0.9944444444444445,
+   "right_reason": 0.9888888888888889,
+   "median_shift": 0.05700844421005513,
+   "call_changed": 0.37777777777777777,
+   "moved_to_clean": 0.125
+  },
+  "empty": {
+   "photos": 360,
+   "flagged": 1.0,
+   "right_reason": 0.9777777777777777,
+   "median_shift": 0.033323463751003146,
+   "call_changed": 0.39444444444444443,
+   "moved_to_clean": 0.3527777777777778
+  },
+  "cut off 40%": {
+   "photos": 360,
+   "flagged": 1.0,
+   "right_reason": 1.0,
+   "median_shift": 0.03200081456452608,
+   "call_changed": 0.2388888888888889,
+   "moved_to_clean": 0.016666666666666666
+  }
+ },
+ "spoiled_good_flagged": 1,
+ "spoiled_good": 66,
+ "spoiled_hidden": 105,
+ "spoiled_hidden_caught": 95
+}
