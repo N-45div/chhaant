@@ -60,3 +60,50 @@ def test_every_step_explains_itself():
     v = InspectionPolicy().inspect(FakeCamera({0.0: 0.95}))
     assert all(s.why for s in v.steps)
     assert v.reason
+
+
+class FlakyCamera(FakeCamera):
+    """Like FakeCamera, but the photos at some angles fail the capture checks."""
+
+    def __init__(self, bad: dict[float, str], top_bad: str = "", **kw):
+        super().__init__({}, **kw)
+        self.bad, self.top_bad = bad, top_bad
+
+    def look_down(self) -> Look:
+        return Look(0.0, 90.0, float("nan"), float("nan"), problem=self.top_bad) if self.top_bad else super().look_down()
+
+    def look_at(self, azimuth: float) -> Look:
+        if azimuth in self.bad:
+            self.looked.append(azimuth)
+            return Look(azimuth, 40.0, float("nan"), float("nan"), problem=self.bad[azimuth])
+        return super().look_at(azimuth)
+
+
+def test_unusable_photo_is_skipped_not_scored():
+    cam = FlakyCamera({0.0: "blurred (outline sharpness 0.1)"})
+    v = InspectionPolicy().inspect(cam)
+    assert v.decision == "clean"
+    assert cam.looked[0] == 0.0 and 0.0 not in cam.looked[1:]  # never retried at the failed angle
+    bad = [s for s in v.steps if s.problem]
+    assert len(bad) == 1 and "unusable" in v.steps[2].why
+    assert "1 photo unusable (blurred x1)" in v.reason
+
+
+def test_three_failed_captures_in_a_row_stop_the_inspection():
+    cam = FlakyCamera({a: "no usable item: no item stands out from the background" for a in [22.5 * i for i in range(16)]})
+    v = InspectionPolicy().inspect(cam)
+    assert v.decision == "escalate" and len(cam.looked) == 3
+    assert "3 captures in a row unusable" in v.reason and v.side_views == 0
+    assert v.ripeness == 0.6  # the overhead view still counted
+
+
+def test_failed_overhead_view_gives_no_ripeness_and_no_coverage():
+    cam = FlakyCamera({a: "too dark (item grey 12)" for a in [22.5 * i for i in range(16)]}, top_bad="too dark (item grey 12)")
+    v = InspectionPolicy().inspect(cam)
+    assert v.decision == "escalate" and v.ripeness is None and v.coverage == 0.0
+
+
+def test_failed_looks_use_up_the_view_budget():
+    cam = FlakyCamera({a: "glare on 30% of the item" for a in (0.0, 135.0, 270.0)}, default=0.5)  # undecided everywhere else
+    v = InspectionPolicy(PolicyConfig(max_views=6)).inspect(cam)
+    assert v.decision == "escalate" and len(cam.looked) == 6 and v.side_views + sum(1 for s in v.steps if s.problem) == 6
