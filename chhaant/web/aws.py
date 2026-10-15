@@ -3,8 +3,10 @@
 Best effort by design: a failed upload is logged and never breaks a run or
 the page. Metrics (namespace ``Chhaant``) let an operator watch the deployed
 cell: how long runs take, how often the cell refused a move, how often the
-agent asked a person, and, for simulated-reviewer runs, how many items were
-packed wrong against the hidden labels.
+agent asked a person, how many photos failed the capture checks, and, for
+simulated-reviewer runs, how many items were packed wrong against the hidden
+labels. The health metrics are also published without a dimension, so one
+alarm covers every run.
 """
 
 import logging
@@ -46,8 +48,11 @@ class AwsReporter:
             "Turns": res.get("turns", 0), "InputTokens": usage.get("input", 0), "OutputTokens": usage.get("output", 0),
             "RefusedMoves": score.get("refused_moves", 0), "PersonRequests": score.get("person_requests", 0),
             "ItemsInspected": score.get("inspected", 0), "PhotosUsed": score.get("views", 0),
+            "UnusablePhotos": score.get("unusable_photos", 0),
         }
         if run.reviewer_mode == "simulated":  # only meaningful when answers came from the labels
             values["PackedWrong"] = score.get("packed_bad", 0)
         unit = {"RunSeconds": "Seconds"}
-        return [{"MetricName": k, "Value": float(v), "Unit": unit.get(k, "Count"), "Dimensions": dims} for k, v in values.items()]
+        data = [{"MetricName": k, "Value": float(v), "Unit": unit.get(k, "Count"), "Dimensions": dims} for k, v in values.items()]
+        return data + [{"MetricName": k, "Value": float(values[k]), "Unit": unit.get(k, "Count")}
+                       for k in ("RunSeconds", "RunFailed", "RefusedMoves", "UnusablePhotos")]

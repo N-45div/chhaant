@@ -282,4 +282,6 @@ class Cell:
                      + sum(len(st.extra_looks) for st in self.state.values()),
             "person_requests": len(self.queue.requests),
             "refused_moves": len(self.trace.of_kind("guardrail")),
+            "unusable_photos": sum((st.inspection or {}).get("unusable_photos") or 0 for st in self.state.values())
+                               + sum(1 for st in self.state.values() for lk in st.extra_looks if lk.get("problem")),
         }

@@ -20,6 +20,8 @@ How to work:
    while an item whose routing for that line is "ask" has not been put to a person.
 5. The cell enforces its rules. If a move is refused, read the reason and choose another action.
 6. Each tool's capability field says what was measured and what was not. Never claim more than it says.
+   A look with a "problem" (blurred, glare, too dark, no item, cut off) was not used as evidence. If an item
+   is escalated because its photos kept failing, ask_person and say the photos failed; never guess past it.
 7. Call finish with a short, concrete summary: what went where and why (cite verdicts, scores, forecasts), which
    lines are short, and anything waiting for a person. Never call the order complete while any line is short."""
 
