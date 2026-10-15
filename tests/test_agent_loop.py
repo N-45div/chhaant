@@ -71,6 +71,18 @@ def test_unknown_tool_and_bad_arguments_do_not_crash():
     assert "bad arguments" in call(cell, "look_closer", {"item_id": "T1", "azimuth": "north"})["error"]
 
 
+def test_null_sent_as_a_string_reads_as_null():
+    # Nemotron sent "order_line": "None" for crate and sell-today moves, ten times in one run.
+    cell = Cell(crate(), FakeInspectors())
+    out = call(cell, "read_order", {"lines": [{"produce": "tomato", "quantity": "1", "eat_in_days": "null"}]})
+    assert out["ok"] and out["order"][0]["quantity"] == 1 and out["order"][0]["eat_in_days"] is None
+    call(cell, "inspect", {"item_id": "T2"})
+    assert call(cell, "place", {"item_id": "T2", "destination": "reject", "order_line": "None", "reason": "spoiled"})["ok"]
+    call(cell, "inspect", {"item_id": "T1"})
+    assert call(cell, "place", {"item_id": "T1", "destination": "order", "order_line": "1", "reason": "clean"})["ok"]
+    assert "bad arguments" in call(cell, "place", {"item_id": "T1", "destination": "crate", "order_line": "first"})["error"]
+
+
 def test_bedrock_messages_and_reply_translation():
     sent = {}
 

@@ -45,6 +45,30 @@ TOOLS = [
 ]
 
 NAMES = {t["name"] for t in TOOLS}
+NULLISH = {"", "none", "null"}
+
+
+def _nullish(v) -> bool:
+    """Some models send null as the string "None" (Nemotron did, ten times in one run)."""
+    return v is None or (isinstance(v, str) and v.strip().lower() in NULLISH)
+
+
+def _optional_int(v) -> int | None:
+    return None if _nullish(v) else int(v)
+
+
+def _order_lines(lines) -> list:
+    out = []
+    for ln in lines or []:
+        ln = dict(ln)
+        if _nullish(ln.get("eat_in_days")):
+            ln["eat_in_days"] = None
+        elif isinstance(ln.get("eat_in_days"), str):
+            ln["eat_in_days"] = float(ln["eat_in_days"])
+        if isinstance(ln.get("quantity"), str) and ln["quantity"].strip().isdigit():
+            ln["quantity"] = int(ln["quantity"])
+        out.append(ln)
+    return out
 
 
 def call(cell, name: str, args: dict) -> dict:
@@ -53,7 +77,7 @@ def call(cell, name: str, args: dict) -> dict:
         return {"ok": False, "error": f"unknown tool {name}"}
     try:
         if name == "read_order":
-            return cell.read_order(args.get("lines") or [])
+            return cell.read_order(_order_lines(args.get("lines")))
         if name == "list_crate":
             return cell.list_crate()
         if name == "inspect":
@@ -63,9 +87,8 @@ def call(cell, name: str, args: dict) -> dict:
         if name == "ask_person":
             return cell.ask_person(str(args["item_id"]), str(args["kind"]), str(args.get("question", "")))
         if name == "place":
-            line = args.get("order_line")
             return cell.place(str(args["item_id"]), str(args["destination"]),
-                              None if line is None else int(line), str(args.get("reason", "")))
+                              _optional_int(args.get("order_line")), str(args.get("reason", "")))
         return cell.finish(str(args.get("summary", "")))
     except (KeyError, TypeError, ValueError) as err:
         return {"ok": False, "error": f"bad arguments for {name}: {err}"}
