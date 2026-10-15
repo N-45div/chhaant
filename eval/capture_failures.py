@@ -24,7 +24,7 @@ import hashlib
 import json
 import os
 import sys
-from multiprocessing import Pool
+from multiprocessing import get_context
 
 import cv2
 import numpy as np
@@ -139,7 +139,8 @@ def measure_photo(r: dict) -> list[dict]:
 
 def measure(model_path: str, rows: list[dict], workers: int) -> list[dict]:
     out = []
-    with Pool(workers, initializer=_init_worker, initargs=(model_path,)) as pool:
+    # spawn, not fork: a child forked after OpenCV has started its thread pool can hang for good
+    with get_context("spawn").Pool(workers, initializer=_init_worker, initargs=(model_path,)) as pool:
         for i, samples in enumerate(pool.imap(measure_photo, rows, chunksize=4)):
             out += samples
             if i % 50 == 0:
@@ -251,8 +252,8 @@ def main() -> None:
     ap.add_argument("--out", default="eval/results/capture_failures")
     ap.add_argument("--workers", type=int, default=os.cpu_count())
     args = ap.parse_args()
-    model = QualityModel(args.model)
     samples = measure(args.model, photos(args.tr6, args.avocado, args.per_split), args.workers)
+    model = QualityModel(args.model)  # only now: no OpenCV state in the parent while the pool runs
     t = calibrate(samples)
     text, summary = report(samples, t)
     with open(args.out + ".md", "w", encoding="utf-8") as fh:
