@@ -34,7 +34,7 @@ def cell():
         CrateItem("A2", "Avocado", "avocado", 20.0, truth={"defective": False, "days_left": 0.0}),
     ]
     results = {"T1": inspection("clean"), "T2": inspection("defective"), "T3": inspection("escalate"),
-               "A1": inspection("clean", Forecast(5.0, 3.6, 6.4)), "A2": inspection("clean", Forecast(0.3, 0.1, 0.7))}
+               "A1": inspection("clean", Forecast(4.5, 3.5, 5.6)), "A2": inspection("clean", Forecast(0.3, 0.1, 0.7))}
     c = Cell(items, FakeInspectors(results))
     c.read_order([{"produce": "tomato", "quantity": 1, "eat_in_days": None},
                   {"produce": "Avocado", "quantity": 1, "eat_in_days": 3}])

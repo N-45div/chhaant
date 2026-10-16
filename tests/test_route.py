@@ -47,7 +47,14 @@ def test_quality_only_line_still_sells_an_over_ripe_item_today():
 def test_rock_hard_avocado_is_not_packed_for_tonight():
     r = route("clean", Forecast(5.8, 4.0, 8.6), 0.5, ripe_window_days=3.0)
     assert r.action == "skip" and "too firm" in r.reason
-    assert route("clean", Forecast(5.8, 4.0, 8.6), 3, ripe_window_days=3.0).action == "pack"
+    assert route("clean", Forecast(5.8, 4.0, 8.6), 3, ripe_window_days=3.0).action == "ask"  # may still be firm
+    assert route("clean", Forecast(4.5, 3.5, 5.6), 3, ripe_window_days=3.0).action == "pack"  # surely ripe by then
+
+
+def test_interval_across_the_ripe_edge_goes_to_a_person():
+    # eval/cell_runs.py: forecast 2.25 (1.41-3.61) packed for tonight, truly 7 days from ripe
+    r = route("clean", Forecast(2.25, 1.41, 3.61), 0.5, ripe_window_days=3.0)
+    assert r.action == "ask" and "may not be ripe" in r.reason
 
 
 def test_ripe_now_avocado_is_packed_for_tonight():

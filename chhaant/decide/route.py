@@ -22,6 +22,12 @@ life (for the avocado data, the ripe stages 3-4 fall in roughly the last three
 days), so it must also be ready by the eating day:
 
 * sound but still too firm by then    -> skip for this order (keep it for a later one)
+* the interval straddles the ripe edge -> a person decides (it may still be too firm)
+
+Both edges are treated alike: an item is packed only when its whole forecast
+interval says it lasts until the eating day and is ripe by then. In the
+end-to-end evaluation, every avocado packed too firm had an interval that
+crossed the ripe edge while its point forecast sat inside.
 """
 
 from dataclasses import dataclass
@@ -54,7 +60,7 @@ def route(decision: str, forecast: Forecast | None, eat_in_days: float | None,
     if ripe_window_days is not None and forecast.low > eat_in_days + ripe_window_days:
         return Routing("skip", f"still too firm to eat in {eat_in_days:g} days; {window}")
     if forecast.low >= eat_in_days:
-        if ripe_window_days is not None and forecast.days > eat_in_days + ripe_window_days:
+        if ripe_window_days is not None and forecast.high > eat_in_days + ripe_window_days:
             return Routing("ask", f"lasts, but may not be ripe in {eat_in_days:g} days; {window}")
         return Routing("pack", f"stays good past the {eat_in_days:g}-day mark; {window}")
     if forecast.high < eat_in_days:
