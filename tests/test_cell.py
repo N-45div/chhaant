@@ -198,6 +198,15 @@ def test_read_order_turns_a_named_day_into_days(cell):
     assert not cell.read_order([{"produce": "avocado", "quantity": 1, "eat_in_days": None, "eat_on": "soon"}])["ok"]
 
 
+def test_finish_will_not_call_a_short_order_complete(cell):
+    for item_id in ("T1", "T2", "T3", "A1", "A2"):
+        cell.inspect(item_id)
+    cell.place("T1", "order", 1)  # line 2 (avocado) stays short
+    r = cell.finish("Order complete: one tomato packed.")
+    assert not r["ok"] and "short by 1" in r["error"] and not cell.finished
+    assert cell.finish("Order incomplete: line 2 is short by one avocado.")["ok"]
+
+
 def test_verdicts_are_acted_on_alone_only_where_validated():
     from chhaant.agent.inspectors import gate, load_validation
     v = load_validation()

@@ -45,6 +45,12 @@ def days_until(day: str, today: date) -> float | None:
     return None
 
 
+def claims_complete(summary: str) -> bool:
+    """Does a summary call the order done ("Order complete", "all complete")?"""
+    return bool(re.search(r"\b(order|all)\b[^.]{0,40}\bcomplete\b", summary, re.I)) and not re.search(
+        r"\b(in|not )complete\b", summary, re.I)
+
+
 @dataclass
 class OrderLine:
     line: int
@@ -306,6 +312,10 @@ class Cell:
         blockers = self._unexplored()
         if blockers:
             return self._refuse("finish", "not yet: " + "; ".join(blockers))
+        short = [f"line {ln.line} is short by {ln.quantity - len(ln.packed)}" for ln in self.order if ln.open]
+        if short and claims_complete(summary):
+            return self._refuse("finish", "the summary calls the order complete, but " + "; ".join(short)
+                                + ". Say which lines are short.")
         self.finished, self.summary = True, summary
         return {"ok": True, "order": [{"line": ln.line, "produce": ln.produce, "packed": ln.packed,
                                        "short_by": ln.quantity - len(ln.packed)} for ln in self.order],
