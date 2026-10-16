@@ -246,7 +246,8 @@ class Cell:
             item = self.items[item_id]
             if line is None:  # not a pack question: judge against the item's most pressing open line
                 line = next((ln for ln in self.order if ln.produce == item.produce and ln.open), None)
-            verdict = self.reviewer.review(req, item.ok_to_pack(line.eat_in_days if line else None))
+            verdict = self.reviewer.review(req, item.ok_to_pack(line.eat_in_days if line else None),
+                                           bool(item.truth.get("defective")))
             if verdict is None:  # a person did not answer in time: the question stays pending
                 self.trace.log("no_answer", request=req.id)
             else:

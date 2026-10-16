@@ -75,11 +75,12 @@ class SimulatedReviewer:
 
     name = "simulated reviewer"
 
-    def review(self, req: Request, truth_ok_to_pack: bool) -> tuple[bool, str]:
+    def review(self, req: Request, truth_ok_to_pack: bool, truth_defective: bool | None = None) -> tuple[bool, str]:
         if req.kind == "pack":
             return truth_ok_to_pack, "fine to pack" if truth_ok_to_pack else "do not pack this one"
-        if req.kind == "reject":
-            return not truth_ok_to_pack, "discard it" if not truth_ok_to_pack else "keep it, it is fine"
+        if req.kind == "reject":  # discard only what is spoiled; a sound item that suits no line goes back
+            spoiled = (not truth_ok_to_pack) if truth_defective is None else truth_defective
+            return spoiled, "discard it" if spoiled else "keep it, it is sound: put it back in the crate"
         return True, "fine to pack" if truth_ok_to_pack else "not fit for this order"
 
 
@@ -93,7 +94,7 @@ class PersonReviewer:
         self._waiting: dict[str, list] = {}
         self._lock = threading.Lock()
 
-    def review(self, req: Request, truth_ok_to_pack: bool) -> tuple[bool, str] | None:
+    def review(self, req: Request, truth_ok_to_pack: bool, truth_defective: bool | None = None) -> tuple[bool, str] | None:
         """Block the agent until a person answers ``req``; None if nobody answers in time."""
         done = threading.Event()
         with self._lock:

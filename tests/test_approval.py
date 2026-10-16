@@ -34,6 +34,13 @@ def test_simulated_reviewer_follows_the_truth():
     q = ApprovalQueue()
     req = q.ask("T1", "pack", "Pack?", {})
     assert SimulatedReviewer().review(req, truth_ok_to_pack=False) == (False, "do not pack this one")
+
+
+def test_simulated_reviewer_discards_only_spoiled_items():
+    q = ApprovalQueue()
+    req = q.ask("A1", "reject", "Not ripe for tonight; discard it?", {})
+    assert SimulatedReviewer().review(req, truth_ok_to_pack=False, truth_defective=False)[0] is False  # sound: keep
+    assert SimulatedReviewer().review(req, truth_ok_to_pack=False, truth_defective=True)[0] is True
     assert SimulatedReviewer.name == "simulated reviewer"
 
 
