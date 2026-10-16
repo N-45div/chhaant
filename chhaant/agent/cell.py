@@ -31,9 +31,12 @@ WEEKDAYS = ("monday", "tuesday", "wednesday", "thursday", "friday", "saturday", 
 def days_until(day: str, today: date) -> float | None:
     """'Saturday', 'next Wednesday', 'tomorrow', 'tonight' -> days from today; None if not a named day.
 
-    A weekday means the coming one (1-7 days ahead); "next" is read the same way.
+    A weekday means the coming one (1-6 days ahead), and today's own weekday means
+    today, as a shopper means "for Saturday" on a Saturday; "next" pushes today's
+    weekday to a week out (a live run read "Saturday" on a Saturday as 7 days).
     """
     key = re.sub(r"[^a-z ]", "", str(day).lower()).strip()
+    is_next = key.startswith("next ")
     key = re.sub(r"^(this|next|on|coming|the)\s+", "", key).strip()
     if key in ("tonight", "today", "this evening"):
         return 0.5
@@ -41,7 +44,8 @@ def days_until(day: str, today: date) -> float | None:
         return 1.0
     match = [d for d in WEEKDAYS if len(key) >= 3 and (d.startswith(key) or key.rstrip("s") == d)]
     if len(match) == 1:  # "sat", "saturday", "saturdays"
-        return float((WEEKDAYS.index(match[0]) - today.weekday()) % 7 or 7)
+        ahead = (WEEKDAYS.index(match[0]) - today.weekday()) % 7
+        return float(ahead) if ahead else (7.0 if is_next else 0.5)
     return None
 
 
