@@ -200,6 +200,7 @@ class Cell:
         insp = st.inspection
         return {"ok": True, "item_id": item_id, "produce": self.items[item_id].produce,
                 "capability": insp["capability"], "verdict": insp["verdict"], "reason": insp["reason"],
+                **({"vision_verdict": insp["vision_verdict"]} if insp.get("vision_verdict") not in (None, insp["verdict"]) else {}),
                 "defect_score": insp.get("defect_score"), "ripeness": insp.get("ripeness"),
                 "coverage": insp.get("coverage"), "unseen_share": insp.get("unseen_share"),
                 "views_used": insp.get("side_views"), "unusable_photos": insp.get("unusable_photos", 0),
