@@ -43,7 +43,11 @@ class BedrockBackend:
         self.model_id, self.max_tokens = model_id, max_tokens
         if client is None:
             import boto3
-            client = boto3.client("bedrock-runtime", region_name=region)
+            from botocore.config import Config
+            # Adaptive retries with patience: one throttled call would otherwise end the whole order
+            # (the end-to-end evaluation lost 9 of 32 runs to ThrottlingException under the default 4 tries).
+            retry = Config(retries={"max_attempts": 10, "mode": "adaptive"}, read_timeout=120)
+            client = boto3.client("bedrock-runtime", region_name=region, config=retry)
         self.client = client
 
     @staticmethod
