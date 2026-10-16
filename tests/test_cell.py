@@ -178,3 +178,15 @@ def test_an_approval_covers_only_its_own_line():
 def test_a_pack_question_needs_an_open_line_for_that_produce():
     c = two_avocado_lines()
     assert not c.ask_person("A1", "pack", "?", order_line=7)["ok"]
+
+
+def test_verdicts_are_acted_on_alone_only_where_validated():
+    from chhaant.agent.inspectors import gate, load_validation
+    v = load_validation()
+    assert gate("Tomato", "clean", "nothing seen", v)[0] == "escalate"  # missed 10 of 10 spoiled
+    assert "missed 10 of 10 spoiled" in gate("Tomato", "clean", "nothing seen", v)[1]
+    assert gate("Tomato", "defective", "spot", v) == ("defective", "spot")  # rejected 0 of 122 fresh
+    assert gate("Banana", "defective", "spot", v)[0] == "escalate"  # rejected 9 of 9 fresh
+    assert gate("Guava", "clean", "nothing seen", v) == ("clean", "nothing seen")  # missed 0 of 18
+    assert gate("Dragon_Fruit", "clean", "nothing seen", v)[0] == "escalate"  # never validated
+    assert gate("Mango", "escalate", "undecided", v) == ("escalate", "undecided")
