@@ -217,3 +217,23 @@ def test_verdicts_are_acted_on_alone_only_where_validated():
     assert gate("Guava", "clean", "nothing seen", v) == ("clean", "nothing seen")  # missed 0 of 18
     assert gate("Dragon_Fruit", "clean", "nothing seen", v)[0] == "escalate"  # never validated
     assert gate("Mango", "escalate", "undecided", v) == ("escalate", "undecided")
+
+
+def test_cannot_finish_short_with_an_approved_item_left_in_the_crate():
+    # Nemotron, iteration 2: a person said "fine to pack" and the item was never placed.
+    c = two_avocado_lines()
+    c.ask_person("A1", "pack", "Can A1 go into the day-4 line?", order_line=2)
+    r = c.finish("Line 2 is short.")
+    assert not r["ok"] and "approved A1 for it: place it there" in r["error"]
+    assert c.place("A1", "order", 2, "approved")["ok"]
+
+
+def test_a_question_about_one_line_does_not_clear_another():
+    items = [CrateItem("A1", "Avocado", "avocado", 20.0, truth={"defective": False, "days_left": 3.0})]
+    c = Cell(items, FakeInspectors({"A1": inspection("clean", Forecast(3.0, 1.0, 5.0))}), reviewer=SimulatedReviewer())
+    c.read_order([{"produce": "avocado", "quantity": 1, "eat_in_days": 0.5},
+                  {"produce": "avocado", "quantity": 1, "eat_in_days": 2}])
+    c.inspect("A1")  # "ask" for both lines
+    c.ask_person("A1", "pack", "For tonight?", order_line=1)  # asked about line 1 only
+    r = c.finish("Both lines short.")
+    assert not r["ok"] and "no person was asked about this line" in r["error"]

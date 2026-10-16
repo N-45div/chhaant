@@ -295,7 +295,8 @@ class Cell:
     def _unexplored(self) -> list[str]:
         """Why a short line is not yet allowed to stay short."""
         reasons = []
-        asked = {r.item_id for r in self.queue.requests}
+        # A pack question is about one line; any other kind of question covers the item as a whole.
+        asked = {(r.item_id, r.order_line if r.kind == "pack" else None) for r in self.queue.requests}
         for ln in self.order:
             if not ln.open:
                 continue
@@ -305,8 +306,12 @@ class Cell:
                     continue
                 if st.inspection is None:
                     reasons.append(f"line {ln.line} is short but {item_id} ({item.produce}) has not been inspected")
-                elif item_id not in asked and any(r["line"] == ln.line and r["action"] == "ask" for r in self._routings(item_id)):
-                    reasons.append(f"line {ln.line} is short but {item_id}'s routing for it is 'ask' and no person was asked")
+                elif self.queue.approved(item_id, "pack", ln.line):
+                    reasons.append(f"line {ln.line} is short but a person approved {item_id} for it: place it there")
+                elif ((item_id, ln.line) not in asked and (item_id, None) not in asked
+                      and any(r["line"] == ln.line and r["action"] == "ask" for r in self._routings(item_id))):
+                    reasons.append(f"line {ln.line} is short but {item_id}'s routing for it is 'ask' and no person "
+                                   "was asked about this line")
         return reasons
 
     def finish(self, summary: str) -> dict:
