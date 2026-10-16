@@ -180,29 +180,49 @@ class Cell:
         self.state[item_id].extra_looks.append(look)
         return {"ok": True, "item_id": item_id, **look}
 
-    def ask_person(self, item_id: str, kind: str, question: str) -> dict:
+    def _pack_line(self, item_id: str, order_line: int | None) -> OrderLine | None:
+        """The line a pack question is about: the one named, else the open line whose routing said "ask"."""
+        item = self.items[item_id]
+        if order_line is not None:
+            return self._line(order_line)
+        open_lines = [ln for ln in self.order if ln.produce == item.produce and ln.open]
+        asks = [ln for ln in open_lines if any(r["line"] == ln.line and r["action"] == "ask" for r in self._routings(item_id))]
+        return (asks or open_lines or [None])[0]
+
+    def ask_person(self, item_id: str, kind: str, question: str, order_line: int | None = None) -> dict:
         if item_id not in self.items:
             return self._refuse("ask_person", f"no item {item_id}")
+        line = None
+        if kind == "pack":
+            line = self._pack_line(item_id, order_line)
+            if line is None or line.produce != self.items[item_id].produce or not line.open:
+                return self._refuse("ask_person", f"a pack question needs an open order line for {self.items[item_id].produce}"
+                                    + (f"; line {order_line} is not one" if order_line is not None else ""), item_id=item_id)
         st = self.state[item_id]
         evidence = {"inspection": None if st.inspection is None else
                     {k: v for k, v in st.inspection.items() if k != "forecast"} | {"forecast": _forecast(st.inspection["forecast"])},
                     "extra_looks": st.extra_looks}
+        if line is not None:
+            evidence["order_line"] = {"line": line.line, "produce": line.produce, "eat_in_days": line.eat_in_days}
         try:
-            req = self.queue.ask(item_id, kind, question, evidence)
+            req = self.queue.ask(item_id, kind, question, evidence, order_line=line.line if line else None)
         except ValueError as err:
             return self._refuse("ask_person", str(err))
-        self.trace.log("ask_person", request=req.id, item_id=item_id, request_kind=kind, question=question)
+        self.trace.log("ask_person", request=req.id, item_id=item_id, request_kind=kind, question=question,
+                       order_line=req.order_line, eat_in_days=line.eat_in_days if line else None)
         if self.reviewer is not None:
             item = self.items[item_id]
-            eat = next((ln.eat_in_days for ln in self.order if ln.produce == item.produce and ln.open), None)
-            verdict = self.reviewer.review(req, item.ok_to_pack(eat))
+            if line is None:  # not a pack question: judge against the item's most pressing open line
+                line = next((ln for ln in self.order if ln.produce == item.produce and ln.open), None)
+            verdict = self.reviewer.review(req, item.ok_to_pack(line.eat_in_days if line else None))
             if verdict is None:  # a person did not answer in time: the question stays pending
                 self.trace.log("no_answer", request=req.id)
             else:
                 approved, answer = verdict
                 self.queue.answer(req.id, approved, answer, by=self.reviewer.name)
                 self.trace.log("answer", request=req.id, approved=approved, answer=answer, by=self.reviewer.name)
-        return {"ok": True, "request_id": req.id, "status": req.status, "answer": req.answer or None, "by": req.by or None}
+        return {"ok": True, "request_id": req.id, "status": req.status, "answer": req.answer or None, "by": req.by or None,
+                **({"order_line": req.order_line} if req.order_line is not None else {})}
 
     def place(self, item_id: str, destination: str, order_line: int | None = None, reason: str = "") -> dict:
         if item_id not in self.items:
@@ -222,7 +242,7 @@ class Cell:
             if insp["verdict"] == "defective":
                 return self._refuse("place", "a defective item never goes into an order", item_id=item_id)
             r = self._route(insp, ln.eat_in_days)
-            if r.action != "pack" and not self.queue.approved(item_id, "pack"):
+            if r.action != "pack" and not self.queue.approved(item_id, "pack", ln.line):
                 return self._refuse("place", f"not packable without a person's approval: {r.reason}", item_id=item_id)
             ln.packed.append(item_id)
             st.location = f"order line {ln.line}"

@@ -167,8 +167,8 @@ class RunManager:
                                                      "forecast": _forecast(insp["forecast"])},
             "extra_looks": st.extra_looks,
             "routing_for_open_lines": cell._routings(item_id),
-            "requests": [{"id": r.id, "kind": r.kind, "question": r.question, "status": r.status,
-                          "answer": r.answer, "by": r.by} for r in cell.queue.requests if r.item_id == item_id],
+            "requests": [{"id": r.id, "kind": r.kind, "question": r.question, "status": r.status, "answer": r.answer,
+                          "by": r.by, "order_line": r.order_line} for r in cell.queue.requests if r.item_id == item_id],
             "actions": [e for e in cell.trace.events if e["kind"] in ("action", "guardrail") and e.get("item_id") == item_id],
         }
 

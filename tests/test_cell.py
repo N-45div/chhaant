@@ -149,3 +149,32 @@ def test_cannot_finish_short_without_asking_about_an_ask_item():
     assert not r["ok"] and "no person was asked" in r["error"]
     c.ask_person("A1", "pack", "Pack for tonight?")
     assert c.finish("short; asked about A1, waiting")["ok"]
+
+
+def two_avocado_lines():
+    items = [CrateItem("A1", "Avocado", "avocado", 20.0, truth={"defective": False, "days_left": 5.0})]
+    c = Cell(items, FakeInspectors({"A1": inspection("clean", Forecast(5.0, 3.6, 6.4))}), reviewer=SimulatedReviewer())
+    c.read_order([{"produce": "avocado", "quantity": 1, "eat_in_days": 0.5},
+                  {"produce": "avocado", "quantity": 1, "eat_in_days": 4}])
+    c.inspect("A1")
+    return c
+
+
+def test_a_pack_question_is_about_the_line_whose_routing_asked():
+    # Too firm for tonight (skip), maybe right for day 4 (ask): the question is about line 2,
+    # and the reviewer judges line 2. Before, it was judged against tonight and declined.
+    c = two_avocado_lines()
+    out = c.ask_person("A1", "pack", "Can A1 go into the day-4 line?")
+    assert out["order_line"] == 2 and out["status"] == "approved"
+
+
+def test_an_approval_covers_only_its_own_line():
+    c = two_avocado_lines()
+    c.ask_person("A1", "pack", "Can A1 go into the day-4 line?", order_line=2)
+    assert not c.place("A1", "order", 1, "tonight")["ok"]  # approved for line 2, not tonight
+    assert c.place("A1", "order", 2, "day 4")["ok"]
+
+
+def test_a_pack_question_needs_an_open_line_for_that_produce():
+    c = two_avocado_lines()
+    assert not c.ask_person("A1", "pack", "?", order_line=7)["ok"]

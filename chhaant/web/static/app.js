@@ -70,7 +70,10 @@ function renderEvent(e) {
     return renderToolResult(e.tool, call.input || {}, e.output);
   }
   if (e.kind === "tool_call") { pendingCalls.push(e); return null; }
-  if (e.kind === "ask_person") return li("ask", `<div class="head">Asks a person (${esc(e.request)}): ${esc(e.request_kind)} ${esc(e.item_id)}</div>${esc(e.question)}<div class="answer" data-request="${esc(e.request)}"></div>`);
+  if (e.kind === "ask_person") {
+    const forLine = e.order_line != null ? ` into line ${esc(e.order_line)}${e.eat_in_days != null ? ` (eaten in ${esc(e.eat_in_days)} d)` : ""}` : "";
+    return li("ask", `<div class="head">Asks a person (${esc(e.request)}): ${esc(e.request_kind)} ${esc(e.item_id)}${forLine}</div>${esc(e.question)}<div class="answer" data-request="${esc(e.request)}"></div>`);
+  }
   if (e.kind === "answer") return li("action", `<div class="head">${esc(e.by)} ${e.approved ? "approved" : "declined"} ${esc(e.request)}</div><div class="small">${esc(e.answer)}</div>`);
   if (e.kind === "no_answer") return li("refused", `No answer to ${esc(e.request)} in time; it stays pending.`);
   if (e.kind === "error") return li("refused", `Run failed: ${esc(e.error)}`);

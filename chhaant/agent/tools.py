@@ -25,11 +25,13 @@ TOOLS = [
                 "required": ["item_id", "azimuth"]}},
     {"name": "ask_person",
      "description": ("Ask a person to decide instead of guessing. kind 'pack' asks permission to pack an item its "
-                     "routing does not clear; 'reject' asks permission to discard an item that looks sound; "
-                     "'question' for anything else. The answer may be pending."),
+                     "routing does not clear into one order line (give order_line; the approval covers that line "
+                     "only); 'reject' asks permission to discard an item that looks sound; 'question' for anything "
+                     "else. The answer may be pending."),
      "schema": {"type": "object", "properties": {
          "item_id": {"type": "string"}, "kind": {"type": "string", "enum": ["pack", "reject", "question"]},
-         "question": {"type": "string"}}, "required": ["item_id", "kind", "question"]}},
+         "question": {"type": "string"}, "order_line": {"type": ["integer", "null"]}},
+                "required": ["item_id", "kind", "question"]}},
     {"name": "place",
      "description": ("Move an item: 'order' (give order_line), 'reject', 'sell_today', or 'crate' (put it back). "
                      "The cell refuses moves its rules do not allow and says why."),
@@ -85,7 +87,8 @@ def call(cell, name: str, args: dict) -> dict:
         if name == "look_closer":
             return cell.look_closer(str(args["item_id"]), float(args["azimuth"]))
         if name == "ask_person":
-            return cell.ask_person(str(args["item_id"]), str(args["kind"]), str(args.get("question", "")))
+            return cell.ask_person(str(args["item_id"]), str(args["kind"]), str(args.get("question", "")),
+                                   _optional_int(args.get("order_line")))
         if name == "place":
             return cell.place(str(args["item_id"]), str(args["destination"]),
                               _optional_int(args.get("order_line")), str(args.get("reason", "")))

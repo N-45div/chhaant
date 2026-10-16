@@ -30,6 +30,7 @@ class Request:
     by: str = ""
     asked_at: str = field(default_factory=lambda: datetime.now(timezone.utc).isoformat(timespec="seconds"))
     answered_at: str = ""
+    order_line: int | None = None  # for "pack": the line it may be packed into, and only that one
 
 
 class ApprovalQueue:
@@ -37,10 +38,10 @@ class ApprovalQueue:
         self.requests: list[Request] = []
         self._ids = itertools.count(1)
 
-    def ask(self, item_id: str, kind: str, question: str, evidence: dict) -> Request:
+    def ask(self, item_id: str, kind: str, question: str, evidence: dict, order_line: int | None = None) -> Request:
         if kind not in ("pack", "reject", "question"):
             raise ValueError(f"unknown request kind: {kind}")
-        req = Request(f"Q{next(self._ids)}", item_id, kind, question, evidence)
+        req = Request(f"Q{next(self._ids)}", item_id, kind, question, evidence, order_line=order_line)
         self.requests.append(req)
         return req
 
@@ -59,8 +60,10 @@ class ApprovalQueue:
                 return r
         raise KeyError(request_id)
 
-    def approved(self, item_id: str, kind: str) -> bool:
-        return any(r.item_id == item_id and r.kind == kind and r.status == "approved" for r in self.requests)
+    def approved(self, item_id: str, kind: str, order_line: int | None = None) -> bool:
+        """An approval covers its own item and kind, and a pack approval only its own order line."""
+        return any(r.item_id == item_id and r.kind == kind and r.status == "approved"
+                   and (order_line is None or r.order_line == order_line) for r in self.requests)
 
     @property
     def pending(self) -> list[Request]:
