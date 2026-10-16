@@ -180,6 +180,24 @@ def test_a_pack_question_needs_an_open_line_for_that_produce():
     assert not c.ask_person("A1", "pack", "?", order_line=7)["ok"]
 
 
+def test_the_cell_counts_days_to_a_named_day():
+    from datetime import date
+    from chhaant.agent.cell import days_until
+    thursday = date(2026, 10, 15)
+    got = {d: days_until(d, thursday) for d in ("Saturday", "monday", "next Wednesday", "Thursday", "Sat",
+                                                "tomorrow", "tonight", "someday")}
+    assert got == {"Saturday": 2, "monday": 4, "next Wednesday": 6, "Thursday": 7, "Sat": 2,
+                   "tomorrow": 1, "tonight": 0.5, "someday": None}
+
+
+def test_read_order_turns_a_named_day_into_days(cell):
+    from datetime import date
+    cell.today = date(2026, 10, 15)  # Thursday; Haiku had read "Monday" as 3 days
+    out = cell.read_order([{"produce": "avocado", "quantity": 2, "eat_in_days": None, "eat_on": "Monday"}])
+    assert out["ok"] and out["order"][0]["eat_in_days"] == 4.0
+    assert not cell.read_order([{"produce": "avocado", "quantity": 1, "eat_in_days": None, "eat_on": "soon"}])["ok"]
+
+
 def test_verdicts_are_acted_on_alone_only_where_validated():
     from chhaant.agent.inspectors import gate, load_validation
     v = load_validation()

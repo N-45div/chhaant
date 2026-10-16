@@ -3,12 +3,14 @@
 TOOLS = [
     {"name": "read_order",
      "description": ("Record your reading of the customer's order as lines. Call this first. "
-                     "eat_in_days is when the item will be eaten (0.5 = tonight, 3 = in three days); "
-                     "use null when the customer gave no timing."),
+                     "eat_in_days is when the item will be eaten (0.5 = tonight, 1 = tomorrow, 3 = in three days); "
+                     "use null when the customer gave no timing, and never assume one. When the customer names a "
+                     "day ('Saturday', 'next Wednesday'), put that in eat_on and leave eat_in_days null: the cell "
+                     "counts the days."),
      "schema": {"type": "object", "properties": {"lines": {"type": "array", "items": {
          "type": "object",
          "properties": {"produce": {"type": "string"}, "quantity": {"type": "integer", "minimum": 1},
-                        "eat_in_days": {"type": ["number", "null"]}},
+                        "eat_in_days": {"type": ["number", "null"]}, "eat_on": {"type": ["string", "null"]}},
          "required": ["produce", "quantity", "eat_in_days"]}}}, "required": ["lines"]}},
     {"name": "list_crate",
      "description": "List the items in the crate with their produce type, where each one is now, and any verdict so far.",

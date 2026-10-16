@@ -9,7 +9,8 @@ Your job is to fill the customer's order from the crate, and to leave every deci
 
 How to work:
 1. Call read_order first with your reading of the order. Use eat_in_days 0.5 for "tonight", 1 for "tomorrow",
-   and so on; use null when the customer gave no timing.
+   and so on. When the customer names a day ("Saturday", "Monday"), pass it as eat_on and let the cell count the
+   days. Use null when the customer gave no timing; never assume one (a tomato "for a sandwich" has no timing).
 2. Call list_crate, then inspect items of the produce you need, one at a time. Each inspection moves the arm and
    takes photos, so do not inspect more items than the order needs, but do put any defective item you find into
    the reject bin so it cannot spoil the rest of the crate.
@@ -39,6 +40,7 @@ def _tool_result(call_id: str, output: dict) -> dict:
 def run(order_text: str, cell, backend, max_turns: int = 40, nudges: int = 2, today: date | None = None) -> dict:
     trace = cell.trace
     today = today or date.today()
+    cell.today = today
     system = system_prompt(today)
     trace.log("start", order=order_text, backend=getattr(backend, "name", "?"),
               model=getattr(backend, "model_id", getattr(backend, "model", "")), today=today.isoformat())

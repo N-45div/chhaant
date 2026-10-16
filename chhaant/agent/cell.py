@@ -16,13 +16,33 @@ A refused move comes back to the model as an explained error and is recorded
 in the trace, so the model can adapt instead of crashing the run.
 """
 
+import re
 from dataclasses import dataclass, field
+from datetime import date
 
 from chhaant.agent.approval import ApprovalQueue
 from chhaant.agent.trace import Trace
 from chhaant.decide.route import RIPE_WINDOW_DAYS, route
 
 DESTINATIONS = ("order", "reject", "sell_today", "crate")
+WEEKDAYS = ("monday", "tuesday", "wednesday", "thursday", "friday", "saturday", "sunday")
+
+
+def days_until(day: str, today: date) -> float | None:
+    """'Saturday', 'next Wednesday', 'tomorrow', 'tonight' -> days from today; None if not a named day.
+
+    A weekday means the coming one (1-7 days ahead); "next" is read the same way.
+    """
+    key = re.sub(r"[^a-z ]", "", str(day).lower()).strip()
+    key = re.sub(r"^(this|next|on|coming|the)\s+", "", key).strip()
+    if key in ("tonight", "today", "this evening"):
+        return 0.5
+    if key == "tomorrow":
+        return 1.0
+    match = [d for d in WEEKDAYS if len(key) >= 3 and (d.startswith(key) or key.rstrip("s") == d)]
+    if len(match) == 1:  # "sat", "saturday", "saturdays"
+        return float((WEEKDAYS.index(match[0]) - today.weekday()) % 7 or 7)
+    return None
 
 
 @dataclass
@@ -79,6 +99,7 @@ def _forecast(f) -> dict | None:
 
 class Cell:
     def __init__(self, items, inspectors, trace: Trace | None = None, reviewer=None, actuator=None):
+        self.today: date | None = None  # set by the agent loop; named days in the order count from it
         self.items = {i.item_id: i for i in items}
         self.state = {i.item_id: ItemState() for i in items}
         self.inspectors = inspectors
@@ -126,6 +147,11 @@ class Cell:
             # The crate's spelling, so "avocados" opens a line the avocados can fill.
             produce = canonical_produce(raw, known) or ALIASES.get(_produce_key(raw)) or raw.title().replace(" ", "_")
             qty, eat = ln.get("quantity"), ln.get("eat_in_days")
+            if ln.get("eat_on"):  # a named day: the cell counts, not the model
+                eat = days_until(ln["eat_on"], self.today or date.today())
+                if eat is None:
+                    return self._refuse("read_order", f"line {n}: eat_on {ln['eat_on']!r} is not a day the cell knows "
+                                        "(use a weekday, 'tomorrow' or 'tonight'), or give eat_in_days instead")
             if not produce or not isinstance(qty, int) or qty < 1:
                 return self._refuse("read_order", f"line {n} needs a produce name and a whole quantity of at least 1")
             if eat is not None and (not isinstance(eat, (int, float)) or eat < 0):
