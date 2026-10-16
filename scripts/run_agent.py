@@ -27,8 +27,8 @@ from chhaant.agent.trace import Trace  # noqa: E402
 from chhaant.decide.shelf import ShelfLife  # noqa: E402
 from chhaant.vision.model import QualityModel  # noqa: E402
 
-DEFAULT_ORDER = ("Hi! For tonight's guacamole I need 2 avocados that are ripe today, plus 1 avocado for "
-                 "Saturday, three days from now. Also 2 good tomatoes for a salad, no rush on those.")
+DEFAULT_ORDER = ("Hi! For tonight's guacamole I need 2 avocados that are ripe today, plus 1 avocado to eat "
+                 "in three days. Also 2 good tomatoes for a salad, no rush on those.")
 TOKEN_FACTORY = "https://api.tokenfactory.nebius.com/v1"
 
 
