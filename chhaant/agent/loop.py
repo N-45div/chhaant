@@ -22,6 +22,8 @@ How to work:
    not been put to a person.
    If a person declines an item for a line, put it back in the crate (destination "crate"): it may suit a later
    order. Discard only items found defective; a sound item that suits no line is never thrown away.
+   A person's time is the scarce thing: inspect first, then put every item that needs them for the same line to
+   them in ONE ask_person call with item_ids, rather than one question per item.
 5. The cell enforces its rules. If a move is refused, read the reason and choose another action.
 6. Each tool's capability field says what was measured and what was not. Never claim more than it says.
    A look with a "problem" (blurred, glare, too dark, no item, cut off) was not used as evidence. If an item
