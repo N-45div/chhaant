@@ -142,7 +142,7 @@ class RunManager:
             "order": [{"line": ln.line, "produce": ln.produce, "quantity": ln.quantity,
                        "eat_in_days": ln.eat_in_days, "packed": list(ln.packed)} for ln in cell.order],
             "items": [self._item_row(cell, i) for i in cell.items],
-            "waiting": [{"request_id": r.id, "item_id": r.item_id, "kind": r.kind, "question": r.question}
+            "waiting": [{"request_id": r.id, "item_id": r.item_id, "kind": r.kind, "question": r.question, "batch": r.batch}
                         for r in cell.queue.requests if r.id in waiting],
             "events": events[after:], "next": len(events),
             "result": run.result, "sim": getattr(cell, "twin", None) is not None, "camera_faults": run.faults,

@@ -72,6 +72,19 @@ function renderEvent(e) {
   if (e.kind === "tool_call") { pendingCalls.push(e); return null; }
   if (e.kind === "ask_person") {
     const forLine = e.order_line != null ? ` into line ${esc(e.order_line)}${e.eat_in_days != null ? ` (eaten in ${esc(e.eat_in_days)} d)` : ""}` : "";
+    if (e.batch) {  // one review of several items: one card, one row (and one answer) per item
+      let card = document.querySelector(`#feed li[data-batch="${e.batch}"]`);
+      if (!card) {
+        card = li("ask", `<div class="head">Asks a person about ${esc(e.batch_size)} items in one review: ${esc(e.request_kind)}${forLine}</div>${esc(e.question)}<div class="batch-items"></div>`);
+        card.dataset.batch = e.batch;
+      }
+      const row = document.createElement("div");
+      row.className = "batch-item";
+      const t = items[e.item_id]?.thumb;
+      row.innerHTML = `${t ? `<img src="${photo(t, 72)}" alt="${esc(e.item_id)}">` : ""}<b>${esc(e.item_id)}</b> <span class="small muted">${esc(e.request)}</span><div class="answer" data-request="${esc(e.request)}"></div>`;
+      card.querySelector(".batch-items").appendChild(row);
+      return card;
+    }
     return li("ask", `<div class="head">Asks a person (${esc(e.request)}): ${esc(e.request_kind)} ${esc(e.item_id)}${forLine}</div>${esc(e.question)}<div class="answer" data-request="${esc(e.request)}"></div>`);
   }
   if (e.kind === "answer") return li("action", `<div class="head">${esc(e.by)} ${e.approved ? "approved" : "declined"} ${esc(e.request)}</div><div class="small">${esc(e.answer)}</div>`);
