@@ -138,6 +138,7 @@ async function poll() {
   const { ok, body } = await api(`/api/runs/${runId}?after=${cursor}`);
   if (!ok) return;
   live = body.status === "running";
+  items = Object.fromEntries(body.items.map((i) => [i.item_id, i]));  // before the events: cards show item photos
   body.events.forEach(renderEvent);
   cursor = body.next;
   renderWaiting(body.waiting);
