@@ -1,0 +1,166 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 800" width="1200" height="800" font-family="Segoe UI, Helvetica, Arial, sans-serif">
+  <title>Chhaant architecture</title>
+  <defs>
+    <marker id="a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#5b5a55"/>
+    </marker>
+    <style>
+      .band { fill: #f6f5f1; stroke: #dddbd2; }
+      .box { fill: #ffffff; stroke: #c9c6bb; stroke-width: 1.2; }
+      .key { fill: #eef5ef; stroke: #2f6b3a; stroke-width: 1.6; }
+      .aws { fill: #fff7ea; stroke: #c98a1a; stroke-width: 1.2; }
+      .h { font-size: 15px; font-weight: 600; fill: #1f1f1c; }
+      .t { font-size: 12.5px; fill: #3d3c38; }
+      .s { font-size: 11.5px; fill: #6b6a64; }
+      .band-h { font-size: 13px; font-weight: 700; fill: #6b6a64; letter-spacing: 0.06em; }
+      .line { stroke: #5b5a55; stroke-width: 1.4; fill: none; marker-end: url(#a); }
+      .dash { stroke: #5b5a55; stroke-width: 1.2; fill: none; stroke-dasharray: 5 4; marker-end: url(#a); }
+      .lbl { font-size: 11px; fill: #5b5a55; }
+    </style>
+  </defs>
+  <rect width="1200" height="800" fill="#ffffff"/>
+
+  <!-- ===== band 1: the inspection cell ===== -->
+  <rect class="band" x="16" y="16" width="1168" height="470" rx="10"/>
+  <text class="band-h" x="34" y="42">THE INSPECTION CELL, PER ORDER</text>
+
+  <rect class="box" x="34" y="62" width="190" height="74" rx="8"/>
+  <text class="h" x="48" y="86">Customer order</text>
+  <text class="t" x="48" y="106">"2 avocados ripe tonight,</text>
+  <text class="t" x="48" y="122">1 for Saturday, 2 tomatoes"</text>
+
+  <rect class="box" x="270" y="62" width="280" height="104" rx="8"/>
+  <text class="h" x="284" y="86">Agent (language model)</text>
+  <text class="t" x="284" y="106">Claude Haiku 4.5 on Amazon Bedrock,</text>
+  <text class="t" x="284" y="122">or NVIDIA Nemotron 3 Super (Nebius)</text>
+  <text class="s" x="284" y="142">reads the order, plans, calls tools, writes</text>
+  <text class="s" x="284" y="157">the summary; never sees the ground truth</text>
+
+  <rect class="key" x="644" y="62" width="300" height="152" rx="8"/>
+  <text class="h" x="658" y="86">Cell: 7 tools, rules in code</text>
+  <text class="t" x="658" y="106">read_order, list_crate, inspect, look_closer,</text>
+  <text class="t" x="658" y="122">ask_person, place, finish</text>
+  <text class="s" x="658" y="142">no placing before inspection; defective never packed;</text>
+  <text class="s" x="658" y="157">a verdict acted on alone only if validated for that</text>
+  <text class="s" x="658" y="172">produce; approvals bound to one item and order line;</text>
+  <text class="s" x="658" y="187">no finishing short while a candidate is unexplored;</text>
+  <text class="s" x="658" y="202">named days counted by the cell; a trace of every step</text>
+
+  <rect class="box" x="984" y="62" width="182" height="104" rx="8"/>
+  <text class="h" x="998" y="86">Person</text>
+  <text class="t" x="998" y="106">reviews several items</text>
+  <text class="t" x="998" y="122">in one glance; each</text>
+  <text class="t" x="998" y="138">answer covers one item</text>
+  <text class="s" x="998" y="157">and one order line</text>
+
+  <rect class="box" x="34" y="250" width="190" height="104" rx="8"/>
+  <text class="h" x="48" y="274">Turntable camera</text>
+  <text class="t" x="48" y="294">replays TriModal Ripeness 6:</text>
+  <text class="t" x="48" y="310">16 real angles + overhead;</text>
+  <text class="t" x="48" y="326">avocados: 2 side photos</text>
+  <text class="s" x="48" y="345">optional simulated faults</text>
+
+  <rect class="key" x="270" y="250" width="280" height="168" rx="8"/>
+  <text class="h" x="284" y="274">OpenCV 5 vision</text>
+  <text class="t" x="284" y="296">1  capture checks: blur, glare, exposure,</text>
+  <text class="t" x="284" y="312">    empty frame, item cut off</text>
+  <text class="t" x="284" y="332">2  segmentation: CIELAB backdrop model,</text>
+  <text class="t" x="284" y="348">    GrabCut fallback, morphology</text>
+  <text class="t" x="284" y="368">3  colour: backdrop white balance, CIELAB</text>
+  <text class="t" x="284" y="388">4  quality model: MobileNetV3 (ONNX) on</text>
+  <text class="t" x="284" y="404">    cv2.dnn ENGINE_NEW: defect, ripeness</text>
+
+  <rect class="key" x="644" y="250" width="300" height="168" rx="8"/>
+  <text class="h" x="658" y="274">Decisions</text>
+  <text class="t" x="658" y="296">rotate until sure: view fusion (median of</text>
+  <text class="t" x="658" y="312">neighbours) + surface coverage map</text>
+  <text class="t" x="658" y="332">shelf-life clock: vision + temperature (Q10),</text>
+  <text class="t" x="658" y="348">80% interval; avocado only</text>
+  <text class="t" x="658" y="368">routing per order line: pack, skip, sell today,</text>
+  <text class="t" x="658" y="384">reject, or ask a person</text>
+  <text class="t" x="658" y="404">crate acceptance: Wald's sequential test</text>
+
+  <rect class="box" x="984" y="250" width="182" height="104" rx="8"/>
+  <text class="h" x="998" y="274">Arm</text>
+  <text class="t" x="998" y="294">SO-101 simulated in</text>
+  <text class="t" x="998" y="310">MuJoCo; poses streamed</text>
+  <text class="t" x="998" y="326">to a three.js 3D view</text>
+  <text class="s" x="998" y="345">order, sell-today, reject, crate</text>
+
+  <!-- arrows, band 1 -->
+  <path class="line" d="M224,99 L266,99"/>
+  <path class="line" d="M550,104 L640,104"/>
+  <text class="lbl" x="568" y="96">tool call</text>
+  <path class="line" d="M640,130 L554,130"/>
+  <text class="lbl" x="558" y="148">result / refusal</text>
+  <path class="line" d="M944,104 L980,104"/>
+  <path class="line" d="M980,140 L948,140"/>
+  <path class="line" d="M794,214 L794,246"/>
+  <text class="lbl" x="802" y="235">inspect</text>
+  <path class="line" d="M640,304 L554,304"/>
+  <text class="lbl" x="568" y="296">next angle</text>
+  <path class="line" d="M550,350 L640,350"/>
+  <text class="lbl" x="558" y="368">score per view</text>
+  <path class="line" d="M270,296 L228,296"/>
+  <text class="lbl" x="230" y="288">turn</text>
+  <path class="line" d="M224,330 L266,330"/>
+  <text class="lbl" x="230" y="348">photo</text>
+  <path class="line" d="M944,290 L980,290"/>
+  <text class="lbl" x="948" y="282">moves</text>
+  <path class="dash" d="M1075,354 L1075,440 L129,440 L129,358"/>
+  <text class="lbl" x="300" y="460">the arm carries each item to the turntable and back (simulated); the photos it decides on are real</text>
+
+  <!-- ===== band 2: AWS ===== -->
+  <rect class="band" x="16" y="500" width="1168" height="284" rx="10"/>
+  <text class="band-h" x="34" y="526">DEPLOYED ON AWS (ap-south-1)</text>
+
+  <rect class="box" x="34" y="550" width="140" height="62" rx="8"/>
+  <text class="h" x="48" y="574">Browser</text>
+  <text class="s" x="48" y="594">order, watch, answer</text>
+
+  <rect class="aws" x="214" y="550" width="160" height="62" rx="8"/>
+  <text class="h" x="228" y="574">CloudFront</text>
+  <text class="s" x="228" y="594">HTTPS; origin locked</text>
+
+  <rect class="aws" x="414" y="550" width="330" height="132" rx="8"/>
+  <text class="h" x="428" y="574">EC2 c8g.large, Graviton4, COOL AMI</text>
+  <text class="t" x="428" y="594">OpenCV 5.1 with Arm KleidiCV (COOL)</text>
+  <text class="t" x="428" y="612">FastAPI app: runs, evidence, photos</text>
+  <text class="t" x="428" y="630">MuJoCo twin of the cell (3D view)</text>
+  <text class="s" x="428" y="650">instance role: no keys on disk;</text>
+  <text class="s" x="428" y="666">only CloudFront may reach port 8000</text>
+
+  <rect class="aws" x="790" y="540" width="180" height="50" rx="8"/>
+  <text class="h" x="804" y="562">Amazon Bedrock</text>
+  <text class="s" x="804" y="580">Claude Haiku 4.5</text>
+  <rect class="aws" x="790" y="600" width="180" height="50" rx="8"/>
+  <text class="h" x="804" y="622">Amazon S3</text>
+  <text class="s" x="804" y="640">evidence per run; artifacts</text>
+  <rect class="aws" x="790" y="660" width="180" height="58" rx="8"/>
+  <text class="h" x="804" y="682">Amazon CloudWatch</text>
+  <text class="s" x="804" y="700">metrics, dashboard, alarms,</text>
+  <text class="s" x="804" y="713">instance auto-recovery</text>
+  <rect class="aws" x="1004" y="540" width="164" height="62" rx="8"/>
+  <text class="h" x="1018" y="562">Systems Manager</text>
+  <text class="s" x="1018" y="580">deploys, no SSH;</text>
+  <text class="s" x="1018" y="594">CloudFormation stack</text>
+  <rect class="aws" x="1004" y="616" width="164" height="102" rx="8"/>
+  <text class="h" x="1018" y="638">Throwaway c8g</text>
+  <text class="s" x="1018" y="656">heavy evaluations and</text>
+  <text class="s" x="1018" y="670">the COOL benchmark;</text>
+  <text class="s" x="1018" y="684">they terminate themselves</text>
+
+  <rect class="box" x="34" y="640" width="340" height="78" rx="8"/>
+  <text class="h" x="48" y="662">Training (Kaggle GPU)</text>
+  <text class="t" x="48" y="682">MobileNetV3, 2 heads, 5 public datasets;</text>
+  <text class="t" x="48" y="698">TriModal Ripeness 6 held out; exported to ONNX</text>
+
+  <path class="line" d="M174,581 L210,581"/>
+  <path class="line" d="M374,581 L410,581"/>
+  <path class="line" d="M744,565 L786,565"/>
+  <path class="line" d="M744,625 L786,625"/>
+  <path class="line" d="M744,665 L786,684"/>
+  <path class="dash" d="M374,680 L410,680"/>
+  <text class="lbl" x="378" y="698">model</text>
+  <text class="lbl" x="34" y="770">All infrastructure is code in deploy/: CloudFormation stack, bootstrap script, systemd unit, evaluation and benchmark runners.</text>
+</svg>
