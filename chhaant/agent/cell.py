@@ -22,7 +22,7 @@ from datetime import date
 
 from chhaant.agent.approval import ApprovalQueue
 from chhaant.agent.trace import Trace
-from chhaant.decide.route import RIPE_WINDOW_DAYS, route
+from chhaant.decide.route import RIPE_WINDOW_DAYS, Routing, route
 
 DESTINATIONS = ("order", "reject", "sell_today", "crate")
 WEEKDAYS = ("monday", "tuesday", "wednesday", "thursday", "friday", "saturday", "sunday")
@@ -141,7 +141,11 @@ class Cell:
     def _route(insp: dict, eat_in_days):
         # produce with a shelf-life forecast is bought to eat ripe: it must also be ready by then
         window = RIPE_WINDOW_DAYS if insp["forecast"] is not None else None
-        return route(insp["verdict"], insp["forecast"], eat_in_days, window)
+        r = route(insp["verdict"], insp["forecast"], eat_in_days, window)
+        if insp["verdict"] == "escalate":  # say why a person decides, not just that the inspection did not
+            gated = re.search(r"A person confirms[^.]*", insp.get("reason", ""))
+            r = Routing("ask", gated.group(0) if gated else f"inspection could not decide: {insp.get('reason', '')}")
+        return r
 
     def _line(self, n) -> OrderLine | None:
         return next((ln for ln in self.order if ln.line == n), None)

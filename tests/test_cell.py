@@ -260,3 +260,13 @@ def test_a_batch_with_an_unknown_item_is_refused_whole():
     c = two_avocado_lines()
     assert not c.ask_person(None, "pack", "?", order_line=2, item_ids=["A1", "A9"])["ok"]
     assert c.queue.requests == []
+
+
+def test_an_escalated_item_says_why_a_person_decides():
+    from chhaant.agent.inspectors import gate, load_validation
+    verdict, reason = gate("Tomato", "clean", "57% inspected, nothing agreed on", load_validation())
+    c = Cell([CrateItem("T1", "Tomato", "tr6", 30.0, truth={"defective": False})],
+             FakeInspectors({"T1": dict(inspection(verdict), reason=reason)}))
+    c.read_order([{"produce": "tomato", "quantity": 1, "eat_in_days": None}])
+    r = c.inspect("T1")["routing_for_open_lines"][0]
+    assert r["action"] == "ask" and r["reason"].startswith("A person confirms: for tomato this inspection missed")
