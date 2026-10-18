@@ -75,3 +75,30 @@ def test_person_reviewer_times_out_and_leaves_it_pending():
     req = ApprovalQueue().ask("T1", "pack", "Pack?", {})
     assert PersonReviewer(timeout_s=0.05).review(req, True) is None
     assert not PersonReviewer().answer("Q9", True, "nobody asked")
+
+
+def test_a_person_sees_a_whole_batch_at_once_and_answers_in_any_order():
+    q, person = ApprovalQueue(), PersonReviewer(timeout_s=5)
+    b = q.new_batch()
+    reqs = [q.ask(i, "pack", "Pack these for line 3?", {}, order_line=3, batch=b) for i in ("T1", "T2", "T3")]
+    got = {}
+    t = threading.Thread(target=lambda: got.update(v=person.review_many(reqs, [(True, False)] * 3)))
+    t.start()
+    for _ in range(100):  # every request of the batch is on screen before any answer
+        if len(person.waiting) == 3:
+            break
+        time.sleep(0.01)
+    assert sorted(person.waiting) == ["Q1", "Q2", "Q3"]
+    for rid, ok in (("Q3", True), ("Q1", False), ("Q2", True)):
+        assert person.answer(rid, ok, "")
+    t.join(2)
+    assert [v[0] for v in got["v"]] == [False, True, True] and person.waiting == []
+    assert q.reviews == 1
+
+
+def test_an_unanswered_item_in_a_batch_stays_pending():
+    q, person = ApprovalQueue(), PersonReviewer(timeout_s=0.2)
+    reqs = [q.ask(i, "pack", "?", {}, order_line=1, batch=q.new_batch()) for i in ("T1", "T2")]
+    threading.Timer(0.05, lambda: person.answer("Q1", True, "")).start()
+    out = person.review_many(reqs)
+    assert out[0] == (True, "") and out[1] is None

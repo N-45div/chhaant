@@ -10,10 +10,15 @@ be scored without a human in the loop; anything it answers is marked
 ``by="simulated reviewer"`` so it is never mistaken for a real person.
 ``PersonReviewer`` is the real thing: the agent waits while a person answers
 in the web app, and a question nobody answers in time stays pending.
+
+Several items can be put to a person in one review (a batch): every request in
+it is shown at once and answered item by item, and each answer still covers
+only its own item (and, for packing, its own order line).
 """
 
 import itertools
 import threading
+import time
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 
@@ -31,17 +36,23 @@ class Request:
     asked_at: str = field(default_factory=lambda: datetime.now(timezone.utc).isoformat(timespec="seconds"))
     answered_at: str = ""
     order_line: int | None = None  # for "pack": the line it may be packed into, and only that one
+    batch: str | None = None       # requests a person reviews together, in one glance
 
 
 class ApprovalQueue:
     def __init__(self):
         self.requests: list[Request] = []
         self._ids = itertools.count(1)
+        self._batches = itertools.count(1)
 
-    def ask(self, item_id: str, kind: str, question: str, evidence: dict, order_line: int | None = None) -> Request:
+    def new_batch(self) -> str:
+        return f"B{next(self._batches)}"
+
+    def ask(self, item_id: str, kind: str, question: str, evidence: dict, order_line: int | None = None,
+            batch: str | None = None) -> Request:
         if kind not in ("pack", "reject", "question"):
             raise ValueError(f"unknown request kind: {kind}")
-        req = Request(f"Q{next(self._ids)}", item_id, kind, question, evidence, order_line=order_line)
+        req = Request(f"Q{next(self._ids)}", item_id, kind, question, evidence, order_line=order_line, batch=batch)
         self.requests.append(req)
         return req
 
@@ -69,6 +80,11 @@ class ApprovalQueue:
     def pending(self) -> list[Request]:
         return [r for r in self.requests if r.status == "pending"]
 
+    @property
+    def reviews(self) -> int:
+        """How many times a person was interrupted: one per batch, one per lone request."""
+        return len({r.batch or r.id for r in self.requests})
+
 
 class SimulatedReviewer:
     """Answers from ground truth, for scoring runs offline. Never presented as a person."""
@@ -83,6 +99,9 @@ class SimulatedReviewer:
             return spoiled, "discard it" if spoiled else "keep it, it is sound: put it back in the crate"
         return True, "fine to pack" if truth_ok_to_pack else "not fit for this order"
 
+    def review_many(self, reqs: list[Request], truths: list[tuple[bool, bool | None]]) -> list[tuple[bool, str]]:
+        return [self.review(r, ok, bad) for r, (ok, bad) in zip(reqs, truths)]
+
 
 class PersonReviewer:
     """A real person answering through the web app. The agent waits up to ``timeout_s``."""
@@ -96,13 +115,21 @@ class PersonReviewer:
 
     def review(self, req: Request, truth_ok_to_pack: bool, truth_defective: bool | None = None) -> tuple[bool, str] | None:
         """Block the agent until a person answers ``req``; None if nobody answers in time."""
-        done = threading.Event()
+        return self.review_many([req], [(truth_ok_to_pack, truth_defective)])[0]
+
+    def review_many(self, reqs: list[Request], truths=None) -> list[tuple[bool, str] | None]:
+        """Show every request at once, then wait until each is answered (one shared deadline)."""
+        slots = [[threading.Event(), None] for _ in reqs]
         with self._lock:
-            self._waiting[req.id] = [done, None]
-        answered = done.wait(self.timeout_s)
+            for req, slot in zip(reqs, slots):
+                self._waiting[req.id] = slot
+        deadline = time.monotonic() + self.timeout_s
+        for slot in slots:
+            slot[0].wait(max(0.0, deadline - time.monotonic()))
         with self._lock:
-            slot = self._waiting.pop(req.id, [done, None])
-        return slot[1] if answered else None
+            for req in reqs:
+                self._waiting.pop(req.id, None)
+        return [slot[1] if slot[0].is_set() else None for slot in slots]
 
     def answer(self, request_id: str, approved: bool, answer: str) -> bool:
         """Called by the web app; False if nothing is waiting on that request."""
