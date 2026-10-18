@@ -6,7 +6,8 @@ you will actually eat it.
 
 *Chhaant* (छाँट) is Hindi for picking out the best from a pile.
 
-Built for the OpenCV AI Competition 2026 (OpenCV 5 + AWS).
+Built for the OpenCV AI Competition 2026 (OpenCV 5 + AWS). The technical report is
+[docs/REPORT.md](docs/REPORT.md); live at <https://d1lk9oj2so3zh7.cloudfront.net>.
 
 > Status: under active development (build window Aug 26 – Oct 26, 2026).
 > This README grows with the code; claims are only made once they are measured.
