@@ -117,7 +117,7 @@ def score(cell, gold, summary: str) -> dict:
 _W = {}
 
 
-def _init(backend_kind: str, model: str | None):
+def _init(backend_kind: str, model: str | None, faults: bool = False):
     import cv2
     cv2.setNumThreads(1)
     from chhaant.agent.inspectors import CellInspectors
@@ -126,6 +126,9 @@ def _init(backend_kind: str, model: str | None):
     from chhaant.vision.model import QualityModel
     _W["inspectors"] = CellInspectors(QualityModel("models/chhaant_quality_v1.onnx"), "data/tr6", "data/avocado",
                                       ShelfLife.load("models/shelf_avocado.json"))
+    if faults:  # the live demo's camera faults: a blurred side view, glare at every angle, a side cut off
+        from chhaant.robot.faults import DEMO_FAULTS
+        _W["inspectors"] = _W["inspectors"].with_faults(DEMO_FAULTS)
     if backend_kind == "bedrock":
         _W["backend"] = lambda: BedrockBackend(**({"model_id": model} if model else {}))
     else:
@@ -190,13 +193,14 @@ def main() -> None:
     ap.add_argument("--crates", default="all", help="e.g. 0,1")
     ap.add_argument("--orders", default="all", help="e.g. 0,3")
     ap.add_argument("--out", default=None)
+    ap.add_argument("--faults", action="store_true", help="spoil photos as the live camera-faults demo does")
     args = ap.parse_args()
     out = args.out or f"eval/results/cell_runs_{args.backend}"
     pick = lambda s, n: range(n) if s == "all" else [int(x) for x in s.split(",")]  # noqa: E731
-    trace_dir = os.path.join("data", "evals", "cell_runs", time.strftime("%Y%m%d-%H%M%S") + f"-{args.backend}")
+    trace_dir = os.path.join("data", "evals", "cell_runs", time.strftime("%Y%m%d-%H%M%S") + f"-{args.backend}" + ("-faults" if args.faults else ""))
     jobs = [{"crate": c, "order": o, "trace_dir": trace_dir}
             for c in pick(args.crates, len(CRATES)) for o in pick(args.orders, len(ORDERS))]
-    with get_context("spawn").Pool(args.workers, initializer=_init, initargs=(args.backend, args.model)) as pool:
+    with get_context("spawn").Pool(args.workers, initializer=_init, initargs=(args.backend, args.model, args.faults)) as pool:
         rows = pool.map(one_run, jobs, chunksize=1)
     text, agg = summarise(rows, args.backend)
     with open(out + ".md", "w", encoding="utf-8") as fh:
