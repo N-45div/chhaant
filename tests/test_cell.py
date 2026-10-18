@@ -237,3 +237,26 @@ def test_a_question_about_one_line_does_not_clear_another():
     c.ask_person("A1", "pack", "For tonight?", order_line=1)  # asked about line 1 only
     r = c.finish("Both lines short.")
     assert not r["ok"] and "no person was asked about this line" in r["error"]
+
+
+def test_one_review_covers_several_items_each_judged_on_its_own():
+    c = Cell([CrateItem("T1", "Tomato", "tr6", 30.0, truth={"defective": False}),
+              CrateItem("T2", "Tomato", "tr6", 30.0, truth={"defective": True}),
+              CrateItem("T3", "Tomato", "tr6", 30.0, truth={"defective": False})],
+             FakeInspectors({i: inspection("escalate") for i in ("T1", "T2", "T3")}), reviewer=SimulatedReviewer())
+    c.read_order([{"produce": "tomato", "quantity": 2, "eat_in_days": None}])
+    for i in ("T1", "T2", "T3"):
+        c.inspect(i)
+    out = c.ask_person(None, "pack", "Pack these tomatoes for line 1?", order_line=1, item_ids=["T1", "T2", "T3"])
+    assert out["ok"] and out["batch"] == "B1"
+    assert {a["item_id"]: a["status"] for a in out["answers"]} == {"T1": "approved", "T2": "declined", "T3": "approved"}
+    assert not c.place("T2", "order", 1)["ok"]  # declined in the batch: still refused
+    assert c.place("T1", "order", 1)["ok"] and c.place("T3", "order", 1)["ok"]
+    s = c.score()
+    assert s["person_requests"] == 3 and s["person_reviews"] == 1
+
+
+def test_a_batch_with_an_unknown_item_is_refused_whole():
+    c = two_avocado_lines()
+    assert not c.ask_person(None, "pack", "?", order_line=2, item_ids=["A1", "A9"])["ok"]
+    assert c.queue.requests == []

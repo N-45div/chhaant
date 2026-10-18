@@ -226,41 +226,59 @@ class Cell:
         asks = [ln for ln in open_lines if any(r["line"] == ln.line and r["action"] == "ask" for r in self._routings(item_id))]
         return (asks or open_lines or [None])[0]
 
-    def ask_person(self, item_id: str, kind: str, question: str, order_line: int | None = None) -> dict:
-        if item_id not in self.items:
-            return self._refuse("ask_person", f"no item {item_id}")
-        line = None
-        if kind == "pack":
-            line = self._pack_line(item_id, order_line)
-            if line is None or line.produce != self.items[item_id].produce or not line.open:
-                return self._refuse("ask_person", f"a pack question needs an open order line for {self.items[item_id].produce}"
-                                    + (f"; line {order_line} is not one" if order_line is not None else ""), item_id=item_id)
-        st = self.state[item_id]
-        evidence = {"inspection": None if st.inspection is None else
-                    {k: v for k, v in st.inspection.items() if k != "forecast"} | {"forecast": _forecast(st.inspection["forecast"])},
-                    "extra_looks": st.extra_looks}
-        if line is not None:
-            evidence["order_line"] = {"line": line.line, "produce": line.produce, "eat_in_days": line.eat_in_days}
-        try:
-            req = self.queue.ask(item_id, kind, question, evidence, order_line=line.line if line else None)
-        except ValueError as err:
-            return self._refuse("ask_person", str(err))
-        self.trace.log("ask_person", request=req.id, item_id=item_id, request_kind=kind, question=question,
-                       order_line=req.order_line, eat_in_days=line.eat_in_days if line else None)
+    def ask_person(self, item_id: str | None, kind: str, question: str, order_line: int | None = None,
+                   item_ids: list[str] | None = None) -> dict:
+        """One question, or one review of several items (``item_ids``): all shown at once, answered item by item."""
+        ids = list(dict.fromkeys(item_ids or ([item_id] if item_id else [])))
+        if not ids:
+            return self._refuse("ask_person", "name the item (item_id) or items (item_ids) to ask about")
+        lines = {}
+        for i in ids:
+            if i not in self.items:
+                return self._refuse("ask_person", f"no item {i}")
+            lines[i] = None
+            if kind == "pack":
+                line = self._pack_line(i, order_line)
+                if line is None or line.produce != self.items[i].produce or not line.open:
+                    return self._refuse("ask_person", f"a pack question needs an open order line for {self.items[i].produce}"
+                                        + (f"; line {order_line} is not one" if order_line is not None else ""), item_id=i)
+                lines[i] = line
+        batch = self.queue.new_batch() if len(ids) > 1 else None
+        reqs = []
+        for i in ids:
+            st, line = self.state[i], lines[i]
+            evidence = {"inspection": None if st.inspection is None else
+                        {k: v for k, v in st.inspection.items() if k != "forecast"} | {"forecast": _forecast(st.inspection["forecast"])},
+                        "extra_looks": st.extra_looks}
+            if line is not None:
+                evidence["order_line"] = {"line": line.line, "produce": line.produce, "eat_in_days": line.eat_in_days}
+            try:
+                req = self.queue.ask(i, kind, question, evidence, order_line=line.line if line else None, batch=batch)
+            except ValueError as err:
+                return self._refuse("ask_person", str(err))
+            self.trace.log("ask_person", request=req.id, item_id=i, request_kind=kind, question=question,
+                           order_line=req.order_line, eat_in_days=line.eat_in_days if line else None,
+                           **({"batch": batch, "batch_size": len(ids)} if batch else {}))
+            reqs.append(req)
         if self.reviewer is not None:
-            item = self.items[item_id]
-            if line is None:  # not a pack question: judge against the item's most pressing open line
-                line = next((ln for ln in self.order if ln.produce == item.produce and ln.open), None)
-            verdict = self.reviewer.review(req, item.ok_to_pack(line.eat_in_days if line else None),
-                                           bool(item.truth.get("defective")))
-            if verdict is None:  # a person did not answer in time: the question stays pending
-                self.trace.log("no_answer", request=req.id)
-            else:
-                approved, answer = verdict
-                self.queue.answer(req.id, approved, answer, by=self.reviewer.name)
-                self.trace.log("answer", request=req.id, approved=approved, answer=answer, by=self.reviewer.name)
-        return {"ok": True, "request_id": req.id, "status": req.status, "answer": req.answer or None, "by": req.by or None,
-                **({"order_line": req.order_line} if req.order_line is not None else {})}
+            truths = []
+            for req in reqs:  # the simulated reviewer judges each item against its own line
+                item, line = self.items[req.item_id], lines[req.item_id]
+                if line is None:  # not a pack question: the item's most pressing open line
+                    line = next((ln for ln in self.order if ln.produce == item.produce and ln.open), None)
+                truths.append((item.ok_to_pack(line.eat_in_days if line else None), bool(item.truth.get("defective"))))
+            for req, verdict in zip(reqs, self.reviewer.review_many(reqs, truths)):
+                if verdict is None:  # a person did not answer in time: the question stays pending
+                    self.trace.log("no_answer", request=req.id)
+                else:
+                    approved, answer = verdict
+                    self.queue.answer(req.id, approved, answer, by=self.reviewer.name)
+                    self.trace.log("answer", request=req.id, approved=approved, answer=answer, by=self.reviewer.name)
+        answers = [{"item_id": r.item_id, "request_id": r.id, "status": r.status, "answer": r.answer or None,
+                    "by": r.by or None, **({"order_line": r.order_line} if r.order_line is not None else {})} for r in reqs]
+        if batch is None:
+            return {"ok": True, **answers[0]}
+        return {"ok": True, "batch": batch, "answers": answers}
 
     def place(self, item_id: str, destination: str, order_line: int | None = None, reason: str = "") -> dict:
         if item_id not in self.items:
@@ -349,6 +367,7 @@ class Cell:
             "views": sum((st.inspection or {}).get("side_views") or 0 for st in self.state.values())
                      + sum(len(st.extra_looks) for st in self.state.values()),
             "person_requests": len(self.queue.requests),
+            "person_reviews": self.queue.reviews,  # interruptions: a batch counts once
             "refused_moves": len(self.trace.of_kind("guardrail")),
             "unusable_photos": sum((st.inspection or {}).get("unusable_photos") or 0 for st in self.state.values())
                                + sum(1 for st in self.state.values() for lk in st.extra_looks if lk.get("problem")),

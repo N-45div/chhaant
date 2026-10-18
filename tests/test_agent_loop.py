@@ -140,3 +140,10 @@ def test_the_run_uses_and_records_the_date():
     run("One tomato.", cell, backend, nudges=0, today=date(2026, 10, 17))
     assert "Today is Saturday 17 October 2026" in backend.system
     assert cell.trace.events[0]["today"] == "2026-10-17"
+
+
+def test_item_ids_may_arrive_as_a_comma_list():
+    cell = Cell(crate(), FakeInspectors())
+    call(cell, "read_order", {"lines": [{"produce": "tomato", "quantity": 2, "eat_in_days": None}]})
+    out = call(cell, "ask_person", {"item_ids": "T1, T2", "kind": "question", "question": "Look at these?"})
+    assert out["ok"] and [a["item_id"] for a in out["answers"]] == ["T1", "T2"]
