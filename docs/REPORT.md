@@ -28,7 +28,7 @@ Live: <https://d1lk9oj2so3zh7.cloudfront.net> (AWS, Graviton4 with the Cloud-Opt
 Produce is where online grocery disappoints: in a 2023 LocalCircles survey of Indian consumers, about 73% said the fresh
 produce they ordered online was of low quality ([Inc42](https://inc42.com/?p=427056)). Picking is done by people in dark stores at speed,
 and the decisions a careful shopper makes in the aisle (turn the tomato over; buy the firm avocado for Saturday and the
-soft one for tonight) do not survive that speed. No robot we found chooses produce by quality for an individual order;
+soft one for tonight) do not survive that speed. No robot I found chooses produce by quality for an individual order;
 existing systems sort by grade on a conveyor or pick by position.
 
 The decision is harder than "good or bad":
@@ -86,7 +86,7 @@ and scales the mask back. It segmented 5,338 of 5,338 TR-6 photos.
 White balance from the backdrop: the median of the backdrop pixels (read off `calcHist` histograms, exact and fast at
 12 MP) sets per-channel gains. Colour statistics are medians in CIELAB with hue angle, chroma, the a\*/b\* tomato
 maturity index and the share of dark spots. A ColorChecker path (`cv2.mcc` + `cv2.ccm`) exists for cells with a chart;
-two OpenCV 5.0.0 behaviours we hit are noted in §9.
+two OpenCV 5.0.0 behaviours I hit are noted in §9.
 
 ### 4.3 Quality model (`chhaant/vision/model.py`, `kaggle/train/`)
 
@@ -112,7 +112,7 @@ On TR-6, which the model never saw, detecting a spoiled session from the worst o
 
 The learned model wins where it matters, but **tomato is at chance**. The ten spoiled TR-6 tomato sessions look fresh
 in RGB from most angles (one has a visible bruise the model scores 0.00); the classical map is even inverted there,
-because fresh tomatoes' stem scars read as defects. We did not tune this away: §6 explains what the cell does instead.
+because fresh tomatoes' stem scars read as defects. I did not tune this away: §6 explains what the cell does instead.
 
 ### 4.5 Capture checks (`chhaant/vision/capture.py`)
 
@@ -212,7 +212,7 @@ dataset's hidden labels, never seen by the agent. A simulated reviewer answers q
 wrong" assumes a person answers correctly. Fill compares correct packs with the most the crate could have filled
 correctly (a bipartite matching of fit items to order slots).
 
-We used it as a loop: measure, explain every wrong pack from the trace (`eval/explain_wrong.py`), fix the cause, measure
+I used it as a loop: measure, explain every wrong pack from the trace (`eval/explain_wrong.py`), fix the cause, measure
 again.
 
 | Claude Haiku 4.5 (Bedrock) | baseline | iter 1 | iter 2 | iter 3 | iter 4 |
@@ -261,7 +261,7 @@ within the run-to-run variation noted in §9.
 
 ### 7.2 Failure cases
 
-Failures we found and what the cell does about them (each is a test in `tests/`):
+Failures I found and what the cell does about them (each is a test in `tests/`):
 
 | Failure | Found by | Now |
 |---|---|---|
@@ -302,23 +302,23 @@ The cell's own OpenCV calls on a real 4000x3000 camera frame, median ms (2 vCPUs
 
 Graviton4 with Arm KleidiCV is 1.4–6.6x faster than Sapphire Rapids with IPP on these calls and 30–41% cheaper per item.
 COOL and the PyPI wheel are the same speed on the same machine and give identical readings, because the aarch64 wheel
-also ships KleidiCV (a newer version, 26.03, than COOL's 0.7.0). Profiling for this benchmark found that our own numpy
+also ships KleidiCV (a newer version, 26.03, than COOL's 0.7.0). Profiling for this benchmark found that my own numpy
 code, not OpenCV, dominated a 12 MP look; moving it to OpenCV calls on the item's window cut a camera-frame look from
 about 1.4 s to 0.25 s on the development laptop, with bit-identical output (`tests/test_vision_fast_paths.py`).
 
 ## 9. Limitations
 
 * **Simulation.** The arm and turntable are simulated; the photos are real but recorded. A live camera would add
-  lighting and motion we have only synthesised (§4.5).
+  lighting and motion I have only synthesised (§4.5).
 * **One fruit per type in TR-6.** Its per-produce numbers rest on one fruit followed for days; the avocado numbers rest
   on 426 fruit. Tomato defect detection is at chance on TR-6, so the cell treats it as unvalidated.
 * **The simulated reviewer is perfect.** "0 wrong packs" assumes a person answers correctly; a person does not see the
   underside either.
 * **Small end-to-end set.** 4 crates x 8 orders per model; differences of a few percent between iterations are within
   run-to-run variation.
-* **OpenCV 5.0.0 behaviours we worked around:** `mcc::CCheckerDetector` found a perfect synthetic chart in only 40–70%
-  of attempts regardless of seed or threads (we retry); `ccm` `correctImage` expects BGR while the fit uses RGB, which
-  doubled the colour error until we swapped channels.
+* **OpenCV 5.0.0 behaviours I worked around:** `mcc::CCheckerDetector` found a perfect synthetic chart in only 40–70%
+  of attempts regardless of seed or threads (the code retries); `ccm` `correctImage` expects BGR while the fit uses RGB, which
+  doubled the colour error until I swapped channels.
 
 ## 10. Reproducing
 
