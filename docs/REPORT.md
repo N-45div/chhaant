@@ -261,6 +261,21 @@ No unusable photo was ever scored, and the glared tomato went to a person and wa
 items lost were avocados the agent allocated differently between lines (A2's forecast now comes from one side),
 within the run-to-run variation noted in §9.
 
+**Repeated, and with an imperfect person.** Iteration 4 rerun three times on every crate and order (96 orders per
+model), and once more with a simulated person who gives the wrong answer 10% or 20% of the time:
+
+| | orders | items packed | packed wrong | 95% upper bound on the wrong rate | fill | interruptions per order |
+|---|---|---|---|---|---|---|
+| Claude Haiku 4.5, 3 repeats | 96 (3 ended by Bedrock "service unavailable" after 10 retries) | 186 | 0 | 1.6% | 94% | 1.9 |
+| Nemotron 3 Super, 3 repeats | 96 | 194 | 0 | 1.5% | 94% | 2.1 |
+| Nemotron, person wrong 10% of the time | 32 | 65 | 9 (14%) | – | 81% | 2.2 |
+| Nemotron, person wrong 20% of the time | 32 | 67 | 11 (16%) | – | 81% | 2.3 |
+
+The zero rests on the person: almost every mistaken "yes" became a wrong pack, because for tomatoes the camera has no
+signal that could contradict it. The cell still does better than acting on its own verdicts (28% wrong in the
+baseline), but the honest claim is that it puts the decisions it cannot make in front of a person, with the evidence;
+it does not make the person unnecessary.
+
 ### 7.2 Failure cases
 
 Failures I found and what the cell does about them (each is a test in `tests/`):
@@ -314,10 +329,11 @@ about 1.4 s to 0.25 s on the development laptop, with bit-identical output (`tes
   lighting and motion I have only synthesised (§4.5).
 * **One fruit per type in TR-6.** Its per-produce numbers rest on one fruit followed for days; the avocado numbers rest
   on 426 fruit. Tomato defect detection is at chance on TR-6, so the cell treats it as unvalidated.
-* **The simulated reviewer is perfect.** "0 wrong packs" assumes a person answers correctly; a person does not see the
-  underside either.
-* **Small end-to-end set.** 4 crates x 8 orders per model; differences of a few percent between iterations are within
-  run-to-run variation.
+* **The person must answer correctly.** "0 wrong packs" uses a reviewer that answers from the labels; with one wrong
+  10–20% of the time, 14–16% of packed items were wrong (§7.1). A person at the cell should turn the item over: the
+  camera never sees the underside either.
+* **Small end-to-end set.** 4 crates x 8 orders per model (96 orders with repeats); differences of a few percent
+  between iterations are within run-to-run variation.
 * **OpenCV 5.0.0 behaviours I worked around:** `mcc::CCheckerDetector` found a perfect synthetic chart in only 40–70%
   of attempts regardless of seed or threads (the code retries); `ccm` `correctImage` expects BGR while the fit uses RGB, which
   doubled the colour error until I swapped channels.
