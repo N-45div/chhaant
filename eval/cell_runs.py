@@ -24,6 +24,7 @@ not against what the model understood:
 import argparse
 import json
 import os
+import random
 import statistics
 import sys
 import time
@@ -58,6 +59,21 @@ ORDERS = [  # (text, gold lines as (produce, quantity, eat_in_days or None))
     ("I'm making guacamole on Monday and need 2 avocados.", [("Avocado", 2, 4.0)]),
     ("One tomato for a sandwich and one avocado for next Wednesday.", [("Tomato", 1, None), ("Avocado", 1, 6.0)]),
 ]
+
+
+class NoisyReviewer(SimulatedReviewer):
+    """A person who gets a share of answers wrong: the label's answer, flipped with probability ``error``."""
+
+    name = "simulated reviewer (noisy)"
+
+    def __init__(self, error: float, seed: int):
+        self.error, self.rng = error, random.Random(seed)
+
+    def review(self, req, truth_ok_to_pack, truth_defective=None):
+        approved, answer = super().review(req, truth_ok_to_pack, truth_defective)
+        if self.rng.random() < self.error:
+            return not approved, f"(a mistaken answer) {answer}"
+        return approved, answer
 
 
 # ---- the oracle -------------------------------------------------------------
@@ -141,20 +157,40 @@ def one_run(job: dict) -> dict:
     crate = CRATES[job["crate"]]
     text, gold = ORDERS[job["order"]]
     items = tr6_items("data/tr6", crate["tr6"], crate["seed"]) + avocado_items("data/avocado", crate["avocado"], crate["seed"])
-    trace = Trace(os.path.join(job["trace_dir"], f"c{job['crate']}-o{job['order']}", "trace.jsonl"))
-    cell = Cell(items, _W["inspectors"], trace=trace, reviewer=SimulatedReviewer())
+    name = f"c{job['crate']}-o{job['order']}" + (f"-r{job['rep']}" if job.get("rep") else "")
+    trace = Trace(os.path.join(job["trace_dir"], name, "trace.jsonl"))
+    error = job.get("reviewer_error", 0.0)
+    reviewer = NoisyReviewer(error, hash((job["crate"], job["order"], job.get("rep", 0)))) if error else SimulatedReviewer()
+    cell = Cell(items, _W["inspectors"], trace=trace, reviewer=reviewer)
     t0 = time.time()
     try:
         out = run(text, cell, _W["backend"](), today=TODAY)
         err = ""
     except Exception as e:  # a crashed run is a result too
         out, err = {"summary": "", "turns": 0, "usage": {"input": 0, "output": 0}}, f"{type(e).__name__}: {e}"
-    res = {"crate": job["crate"], "order": job["order"], "error": err, "seconds": round(time.time() - t0, 1),
+    res = {"crate": job["crate"], "order": job["order"], "rep": job.get("rep", 0), "error": err,
+           "seconds": round(time.time() - t0, 1),
            "turns": out.get("turns", 0), "tokens_in": out["usage"]["input"], "tokens_out": out["usage"]["output"],
            **score(cell, gold, out.get("summary", "") or "")}
     print(f"crate {job['crate']} order {job['order']}: right {res['packed_right']} wrong {res['packed_wrong']} "
           f"of best {res['best_possible']}, questions {res['questions']}, {res['seconds']} s {err}", flush=True)
     return res
+
+
+def upper_95(k: int, n: int) -> float:
+    """Clopper-Pearson one-sided 95% upper bound on a rate seen k times in n (0 of n gives about 3/n)."""
+    if n == 0:
+        return 1.0
+    from math import comb
+
+    def cdf(p):  # P(X <= k) for X ~ Binomial(n, p)
+        return sum(comb(n, i) * p ** i * (1 - p) ** (n - i) for i in range(k + 1))
+
+    lo, hi = k / n, 1.0
+    for _ in range(60):  # the p where P(X <= k) falls to 5%
+        mid = (lo + hi) / 2
+        lo, hi = (mid, hi) if cdf(mid) > 0.05 else (lo, mid)
+    return hi
 
 
 def summarise(rows: list[dict], backend: str) -> tuple[str, dict]:
@@ -166,6 +202,7 @@ def summarise(rows: list[dict], backend: str) -> tuple[str, dict]:
            "packed_wrong": tot("packed_wrong"), "best_possible": best,
            "fill": round(tot("packed_right") / best, 3) if best else None,
            "wrong_share_of_packed": round(tot("packed_wrong") / max(1, tot("packed_right") + tot("packed_wrong")), 3),
+           "wrong_share_upper_95": round(upper_95(tot("packed_wrong"), tot("packed_right") + tot("packed_wrong")), 4),
            "wasted_sound": tot("wasted_sound"), "questions_per_run": round(tot("questions") / max(1, len(ok)), 2),
            "reviews_per_run": round(sum(r.get("reviews", r["questions"]) for r in ok) / max(1, len(ok)), 2),
            "refused_per_run": round(tot("refused_moves") / max(1, len(ok)), 2),
@@ -194,12 +231,14 @@ def main() -> None:
     ap.add_argument("--orders", default="all", help="e.g. 0,3")
     ap.add_argument("--out", default=None)
     ap.add_argument("--faults", action="store_true", help="spoil photos as the live camera-faults demo does")
+    ap.add_argument("--repeat", type=int, default=1, help="run every crate x order this many times")
+    ap.add_argument("--reviewer-error", type=float, default=0.0, help="share of a (simulated) person's answers that are wrong")
     args = ap.parse_args()
     out = args.out or f"eval/results/cell_runs_{args.backend}"
     pick = lambda s, n: range(n) if s == "all" else [int(x) for x in s.split(",")]  # noqa: E731
     trace_dir = os.path.join("data", "evals", "cell_runs", time.strftime("%Y%m%d-%H%M%S") + f"-{args.backend}" + ("-faults" if args.faults else ""))
-    jobs = [{"crate": c, "order": o, "trace_dir": trace_dir}
-            for c in pick(args.crates, len(CRATES)) for o in pick(args.orders, len(ORDERS))]
+    jobs = [{"crate": c, "order": o, "rep": r, "trace_dir": trace_dir, "reviewer_error": args.reviewer_error}
+            for r in range(args.repeat) for c in pick(args.crates, len(CRATES)) for o in pick(args.orders, len(ORDERS))]
     with get_context("spawn").Pool(args.workers, initializer=_init, initargs=(args.backend, args.model, args.faults)) as pool:
         rows = pool.map(one_run, jobs, chunksize=1)
     text, agg = summarise(rows, args.backend)
