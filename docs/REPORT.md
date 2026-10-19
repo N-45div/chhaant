@@ -54,6 +54,8 @@ The cell (top half of the diagram) runs once per order:
    and **finish** is refused while a short line still has an unexplored candidate or an approved item left in the crate.
 4. Every step is written to a JSONL trace; the web page shows it live, with each item's photos as evidence.
 
+![Agent workflow: one order](agent_workflow.svg)
+
 The tools the model sees are `read_order`, `list_crate`, `inspect`, `look_closer`, `ask_person`, `place` and
 `finish` (`chhaant/agent/tools.py`). Two models are supported through the same tools: Claude Haiku 4.5 on Amazon
 Bedrock (the deployment) and NVIDIA Nemotron 3 Super on Nebius Token Factory.
@@ -334,7 +336,9 @@ python eval/rotate_until_sure.py ...              # §5.1; every eval/ script do
 bash deploy/deploy.sh                    # the AWS stack (needs an AWS login and the COOL subscription)
 ```
 
-The quality model (`models/chhaant_quality_v1.onnx`, 12.9 MB) is trained by `kaggle/train/train.py`; *its download
+Checked on 20 October 2026 from a fresh export of the repository on Ubuntu 24.04 (WSL) with Python 3.12 and only the
+pinned requirements: 206 tests pass after `scripts/fetch_so101.py`; the 4 still skipped need the TR-6 photos or the model
+file. The quality model (`models/chhaant_quality_v1.onnx`, 12.9 MB) is trained by `kaggle/train/train.py`; *its download
 link will be added here.* All results quoted are files in `eval/results/`.
 
 ## Credits
