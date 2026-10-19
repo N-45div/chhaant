@@ -1,0 +1,113 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 900" width="1200" height="900" font-family="Segoe UI, Helvetica, Arial, sans-serif">
+  <title>Chhaant agent workflow: one order</title>
+  <defs>
+    <marker id="a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#4a4945"/>
+    </marker>
+    <marker id="r" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#a3271f"/>
+    </marker>
+    <style>
+      .lane { fill: #ffffff; stroke: #c9c6bb; stroke-width: 1.2; }
+      .key { fill: #eef5ef; stroke: #2f6b3a; stroke-width: 1.6; }
+      .life { stroke: #c9c6bb; stroke-width: 1.2; stroke-dasharray: 4 5; }
+      .h { font-size: 14px; font-weight: 600; fill: #1f1f1c; }
+      .sub { font-size: 11px; fill: #6b6a64; }
+      .m { stroke: #4a4945; stroke-width: 1.4; fill: none; marker-end: url(#a); }
+      .back { stroke: #4a4945; stroke-width: 1.2; fill: none; stroke-dasharray: 6 4; marker-end: url(#a); }
+      .no { stroke: #a3271f; stroke-width: 1.4; fill: none; stroke-dasharray: 6 4; marker-end: url(#r); }
+      .t { font-size: 12px; fill: #2c2b28; }
+      .tn { font-size: 12px; fill: #a3271f; }
+      .step { font-size: 12px; font-weight: 700; fill: #2f6b3a; }
+      .loop { fill: #f6f5f1; stroke: #dddbd2; }
+      .note { font-size: 11px; fill: #6b6a64; font-style: italic; }
+    </style>
+  </defs>
+  <rect width="1200" height="900" fill="#ffffff"/>
+  <text class="h" x="24" y="30">One order, step by step (composed from behaviours seen in real runs): "2 tomatoes for a salad and an avocado for Saturday"</text>
+
+  <!-- lane heads -->
+  <rect class="lane" x="70" y="48" width="170" height="46" rx="8"/>
+  <text class="h" x="86" y="68">Agent</text><text class="sub" x="86" y="84">language model</text>
+  <rect class="key" x="345" y="48" width="170" height="46" rx="8"/>
+  <text class="h" x="361" y="68">Cell</text><text class="sub" x="361" y="84">tools and rules, in code</text>
+  <rect class="key" x="620" y="48" width="170" height="46" rx="8"/>
+  <text class="h" x="636" y="68">Vision + decisions</text><text class="sub" x="636" y="84">OpenCV 5, routing</text>
+  <rect class="lane" x="845" y="48" width="150" height="46" rx="8"/>
+  <text class="h" x="861" y="68">Person</text><text class="sub" x="861" y="84">on the web page</text>
+  <rect class="lane" x="1030" y="48" width="140" height="46" rx="8"/>
+  <text class="h" x="1046" y="68">Arm</text><text class="sub" x="1046" y="84">SO-101 in MuJoCo</text>
+
+  <line class="life" x1="155" y1="94" x2="155" y2="880"/>
+  <line class="life" x1="430" y1="94" x2="430" y2="880"/>
+  <line class="life" x1="705" y1="94" x2="705" y2="880"/>
+  <line class="life" x1="920" y1="94" x2="920" y2="880"/>
+  <line class="life" x1="1100" y1="94" x2="1100" y2="880"/>
+
+  <!-- 1 read the order -->
+  <text class="step" x="24" y="128">1</text>
+  <path class="m" d="M155,124 L426,124"/>
+  <text class="t" x="166" y="117">read_order: tomato x2, avocado x1 eat_on "Saturday"</text>
+  <path class="back" d="M430,150 L159,150"/>
+  <text class="t" x="166" y="167">lines, with the days to Saturday counted by the cell (2 on a Thursday)</text>
+
+  <!-- 2 inspect a tomato -->
+  <text class="step" x="24" y="205">2</text>
+  <path class="m" d="M155,200 L426,200"/>
+  <text class="t" x="166" y="193">inspect T1</text>
+  <path class="m" d="M430,212 L1096,212"/>
+  <text class="t" x="790" y="206">carry T1 to the turntable</text>
+  <rect class="loop" x="440" y="226" width="420" height="96" rx="6"/>
+  <text class="note" x="450" y="240">rotate until sure (about 4 views)</text>
+  <path class="m" d="M450,266 L701,266"/>
+  <text class="t" x="458" y="259">photo at 0°, 157.5°, 247.5°...</text>
+  <path class="back" d="M705,284 L454,284"/>
+  <text class="t" x="458" y="300">capture checks pass; defect 0.00, ripeness 0.99 per view</text>
+  <text class="t" x="458" y="316">fused: clean, 57% of the surface seen, underside unseen</text>
+  <path class="back" d="M430,348 L159,348"/>
+  <text class="t" x="166" y="341">verdict escalate, routing "ask":</text>
+  <text class="tn" x="166" y="364">"for tomato this inspection missed 10 of 10 spoiled ones in validation"</text>
+  <text class="note" x="166" y="382">(T2, T3 and the avocados are inspected the same way)</text>
+
+  <!-- 3 one review -->
+  <text class="step" x="24" y="420">3</text>
+  <path class="m" d="M155,415 L426,415"/>
+  <text class="t" x="166" y="408">ask_person item_ids [T1, T2, T3], line 1</text>
+  <path class="m" d="M430,440 L916,440"/>
+  <text class="t" x="560" y="433">one review card: three photos, one question</text>
+  <path class="back" d="M920,466 L434,466"/>
+  <text class="t" x="560" y="482">T1 yes, T2 no ("soft spot underneath"), T3 yes</text>
+  <path class="back" d="M430,500 L159,500"/>
+  <text class="t" x="166" y="493">answers, one per item and line</text>
+
+  <!-- 4 placing, with a refusal -->
+  <text class="step" x="24" y="540">4</text>
+  <path class="m" d="M155,535 L426,535"/>
+  <text class="t" x="166" y="528">place T1 into line 1</text>
+  <path class="m" d="M430,548 L1096,548"/>
+  <text class="t" x="790" y="542">T1 to the order bin</text>
+  <path class="m" d="M155,580 L426,580"/>
+  <text class="t" x="166" y="573">place T2 into line 1</text>
+  <path class="no" d="M430,600 L159,600"/>
+  <text class="tn" x="166" y="618">refused: a person declined T2 for this line</text>
+
+  <!-- 5 avocado -->
+  <text class="step" x="24" y="660">5</text>
+  <path class="m" d="M155,655 L426,655"/>
+  <text class="t" x="166" y="648">place A1 into line 2 (Saturday)</text>
+  <path class="no" d="M430,676 L159,676"/>
+  <text class="tn" x="166" y="694">refused: forecast 4.5 days (3.1-6.8) may not be ripe by then; ask first</text>
+
+  <!-- 6 finish -->
+  <text class="step" x="24" y="740">6</text>
+  <path class="m" d="M155,735 L426,735"/>
+  <text class="t" x="166" y="728">finish "Order complete"</text>
+  <path class="no" d="M430,756 L159,756"/>
+  <text class="tn" x="166" y="774">refused: line 2 is short by 1; say which lines are short</text>
+  <path class="m" d="M155,800 L426,800"/>
+  <text class="t" x="166" y="793">finish "Packed T1, T3. Line 2 short: no avocado ripe by Saturday."</text>
+  <path class="back" d="M430,822 L159,822"/>
+  <text class="t" x="166" y="839">done; trace to S3, metrics to CloudWatch</text>
+
+  <text class="note" x="560" y="868">Every arrow is a line in the run's JSONL trace; red arrows are the cell's rules refusing a move.</text>
+</svg>
