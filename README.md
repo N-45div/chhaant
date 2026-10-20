@@ -47,6 +47,25 @@ access); set `CHHAANT_BACKEND=nemotron` and `NEBIUS_API_KEY` to run it on NVIDIA
 Nemotron through Nebius Token Factory instead. Choose "You, here on this page"
 to answer the agent's questions yourself: it waits for your answer.
 
+## Bring your own agent (MCP)
+
+The cell is also an MCP server, so an agent in any MCP client can work the crate:
+
+```bash
+claude mcp add chhaant -e PYTHONPATH=$PWD -- $PWD/.venv/bin/python -m chhaant.mcp_server
+```
+
+Any other client can start the same command over stdio. The tools are the cell's
+own (`read_order`, `list_crate`, `inspect`, `look_closer`, `ask_person`, `place`,
+`finish`, plus `new_crate`), and the rules stay in the cell: a client's agent is
+refused exactly what the built-in agent is refused. `ask_person` reaches the
+client's person as an MCP elicitation form, one per review with a box per item.
+An empty box is a no. If the client cannot show forms, the question stays
+pending, and pending never counts as approval. For unattended runs,
+`--simulated-reviewer` answers from the dataset labels and marks every answer as
+simulated. Each crate's trace goes to `data/mcp_runs/`. `eval/mcp_runs.py` runs
+the 32 evaluation orders this way, with Claude Code as the agent.
+
 ## Licence
 
 Apache License 2.0 (see [LICENSE](LICENSE)).
