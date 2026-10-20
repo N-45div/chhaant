@@ -204,7 +204,7 @@ it inspects **38–79 items instead of the fixed plan's 135** with 4–10 person
 promises (accepts a 5% crate 97.0% of the time, a 20% crate 4.4%). Modelling the hand-offs mattered: ignoring them made
 the test accept good crates only 88% of the time.
 
-## 6. Knowing what the camera cannot see
+## 6. Appropriate autonomy: knowing what the camera cannot see
 
 A clean verdict is acted on alone only if validation says it can be (`chhaant/agent/inspectors.py`): for each produce,
 the leave-one-fruit-out results give how often rotate-until-sure called a spoiled item clean and a fresh item defective.
@@ -213,6 +213,12 @@ inspection missed 10 of 10 spoiled ones in validation". Banana's defective calls
 rejected 9 of 9 fresh ones). This is the change that took wrong packs to zero (§7.1). It costs questions, so a person
 reviews all the items that need them for an order line **in one glance**, each answer still binding only its own item
 and line.
+
+The resulting split of autonomy is explicit and measured. The cell acts alone on: banana, carrot and guava "clean"
+calls (no spoiled one missed in validation), tomato, mango, amla and guava "defective" calls (no fresh one wrongly rejected),
+and avocados whose whole forecast interval fits the eating day. A person decides: tomato, mango and amla "clean" calls,
+banana and carrot "defective" calls, avocados whose interval crosses an edge, and anything the inspection could not
+decide or the camera could not photograph properly.
 
 ## 7. Evaluation
 
