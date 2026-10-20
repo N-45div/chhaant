@@ -68,3 +68,13 @@ def avocado_items(data_root: str, days_left: list[int], seed: int = 0) -> list[C
         items.append(CrateItem(f"A{n}", "Avocado", "avocado", 20.0, photos=[p.file for p in pair],
                                truth={"defective": stage >= 5, "days_left": float(left), "stage": stage}))
     return items
+
+
+# The crate the web app and the MCP server put in front of an agent: three tomatoes (one spoiled), a spoiled mango,
+# and avocados with 6, 2, 1 and 0 true days left.
+DEMO_TR6_PICKS = [("Tomato", 0), ("Tomato", 1), ("Tomato", 0), ("Mango", 1)]
+DEMO_AVOCADO_DAYS_LEFT = [6, 2, 1, 0]
+
+
+def demo_crate(tr6_root: str, avocado_root: str, seed: int = 0) -> list[CrateItem]:
+    return tr6_items(tr6_root, DEMO_TR6_PICKS, seed) + avocado_items(avocado_root, DEMO_AVOCADO_DAYS_LEFT, seed)

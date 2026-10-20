@@ -19,7 +19,7 @@ from functools import lru_cache
 import uvicorn
 
 from chhaant.agent.cell import Cell
-from chhaant.agent.crate import avocado_items, tr6_items
+from chhaant.agent.crate import demo_crate
 from chhaant.agent.inspectors import CellInspectors
 from chhaant.agent.llm import BedrockBackend, OpenAICompatBackend
 from chhaant.decide.shelf import ShelfLife
@@ -29,8 +29,6 @@ from chhaant.web.app import create_app
 from chhaant.web.runs import RunManager
 
 TOKEN_FACTORY = "https://api.tokenfactory.nebius.com/v1"
-TR6_PICKS = [("Tomato", 0), ("Tomato", 1), ("Tomato", 0), ("Mango", 1)]
-AVOCADO_DAYS_LEFT = [6, 2, 1, 0]
 
 
 def build_app():
@@ -41,7 +39,7 @@ def build_app():
 
     @lru_cache(maxsize=16)
     def crate(seed: int):
-        return tuple(tr6_items(tr6, TR6_PICKS, seed) + avocado_items(avocado, AVOCADO_DAYS_LEFT, seed))
+        return tuple(demo_crate(tr6, avocado, seed))
 
     try:  # the 3D twin needs MuJoCo (present on the Linux server; blocked on some Windows setups)
         from chhaant.sim.twin import SimTwin, TwinActuator, TwinInspectors
