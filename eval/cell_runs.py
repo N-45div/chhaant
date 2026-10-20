@@ -234,19 +234,29 @@ def main() -> None:
     ap.add_argument("--faults", action="store_true", help="spoil photos as the live camera-faults demo does")
     ap.add_argument("--repeat", type=int, default=1, help="run every crate x order this many times")
     ap.add_argument("--reviewer-error", type=float, default=0.0, help="share of a (simulated) person's answers that are wrong")
+    ap.add_argument("--rerun-errors", action="store_true", help="run again only the runs in --out that ended in an error")
     args = ap.parse_args()
     out = args.out or f"eval/results/cell_runs_{args.backend}"
     pick = lambda s, n: range(n) if s == "all" else [int(x) for x in s.split(",")]  # noqa: E731
     trace_dir = os.path.join("data", "evals", "cell_runs", time.strftime("%Y%m%d-%H%M%S") + f"-{args.backend}" + ("-faults" if args.faults else ""))
+    kept, trace_dirs = [], []
+    if args.rerun_errors:
+        with open(out + ".json") as fh:
+            prior = json.load(fh)
+        kept = [r for r in prior["runs"] if not r["error"]]
+        trace_dirs = [prior["traces"]] if isinstance(prior["traces"], str) else prior["traces"]
+        triples = [(r["rep"], r["crate"], r["order"]) for r in prior["runs"] if r["error"]]
+    else:
+        triples = [(r, c, o) for r in range(args.repeat) for c in pick(args.crates, len(CRATES)) for o in pick(args.orders, len(ORDERS))]
     jobs = [{"crate": c, "order": o, "rep": r, "trace_dir": trace_dir, "reviewer_error": args.reviewer_error}
-            for r in range(args.repeat) for c in pick(args.crates, len(CRATES)) for o in pick(args.orders, len(ORDERS))]
+            for r, c, o in triples]
     with get_context("spawn").Pool(args.workers, initializer=_init, initargs=(args.backend, args.model, args.faults)) as pool:
-        rows = pool.map(one_run, jobs, chunksize=1)
+        rows = kept + pool.map(one_run, jobs, chunksize=1)
     text, agg = summarise(rows, args.backend)
     with open(out + ".md", "w", encoding="utf-8") as fh:
         fh.write(text)
     with open(out + ".json", "w") as fh:
-        json.dump({"summary": agg, "runs": rows, "traces": trace_dir}, fh, indent=1)
+        json.dump({"summary": agg, "runs": rows, "traces": trace_dirs + [trace_dir] if trace_dirs else trace_dir}, fh, indent=1)
     print(text)
 
 
