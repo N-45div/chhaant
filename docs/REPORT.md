@@ -39,6 +39,17 @@ The decision is harder than "good or bad":
 * for a whole supplier crate, the question is whether to accept the lot, and inspecting everything is wasteful;
 * some calls the camera simply cannot make, and the system must know which.
 
+### 2.1 Users
+
+* **The picker at the cell** (in a dark store or a store's back room) answers the cell's questions: one review card per
+  order line, each item's photos and the reason the cell cannot decide alone. They are the human in control.
+* **The customer** writes the order in plain words ("an avocado for Saturday's brunch") and gets items chosen for the
+  day they will eat them, with a summary that says plainly when a line is short.
+* **The store operator** watches the CloudWatch dashboard and alarms (failed runs, a burst of unusable photos, an
+  unhealthy instance) and reads any run's evidence in S3.
+* **A buyer receiving supplier crates** uses the sequential acceptance test (§5.4) to accept or reject a lot with far
+  fewer inspections than a fixed sampling plan.
+
 ## 3. System
 
 The cell (top half of the diagram) runs once per order:
@@ -88,7 +99,7 @@ and scales the mask back. It segmented 5,338 of 5,338 TR-6 photos.
 White balance from the backdrop: the median of the backdrop pixels (read off `calcHist` histograms, exact and fast at
 12 MP) sets per-channel gains. Colour statistics are medians in CIELAB with hue angle, chroma, the a\*/b\* tomato
 maturity index and the share of dark spots. A ColorChecker path (`cv2.mcc` + `cv2.ccm`) exists for cells with a chart;
-two OpenCV 5.0.0 behaviours I hit are noted in §9.
+two OpenCV 5.0.0 behaviours I hit are noted in §11.
 
 ### 4.3 Quality model (`chhaant/vision/model.py`, `kaggle/train/`)
 
@@ -259,7 +270,7 @@ tomato, glare at every angle on another, one avocado side cut off by the frame):
 
 No unusable photo was ever scored, and the glared tomato went to a person and was still packed when sound. The few
 items lost were avocados the agent allocated differently between lines (A2's forecast now comes from one side),
-within the run-to-run variation noted in §9.
+within the run-to-run variation noted in §11.
 
 **Repeated, and with an imperfect person.** Iteration 4 rerun three times on every crate and order (96 orders per
 model), and once more with a simulated person who gives the wrong answer 10% or 20% of the time:
@@ -323,7 +334,61 @@ also ships KleidiCV (a newer version, 26.03, than COOL's 0.7.0). Profiling for t
 code, not OpenCV, dominated a 12 MP look; moving it to OpenCV calls on the item's window cut a camera-frame look from
 about 1.4 s to 0.25 s on the development laptop, with bit-identical output (`tests/test_vision_fast_paths.py`).
 
-## 9. Limitations
+### 8.3 Evidence that COOL runs the core workload
+
+* **Deployment:** EC2 c8g.large (Graviton4, Neoverse V2) in ap-south-1, from the COOL Marketplace AMI
+  `ami-05a336eb12c47d427`; the app runs in COOL's Python 3.12 venv with COOL's own `cv2`.
+* **Version:** `cv2.__version__` is `5.1.0-dev`; `getBuildInformation()` reports `Custom HAL: YES (carotene (ver 0.0.1)
+  KleidiCV (ver 0.7.0))` and baseline `SVE NEON FP16 NEON_DOTPROD NEON_FP16 NEON_BF16`.
+* **Enforced, not assumed:** the bootstrap (`deploy/bootstrap.sh`) refuses to finish unless the loaded OpenCV reports
+  KleidiCV, and never installs the PyPI OpenCV wheel on the server. The live site's `/api/health` returns the build
+  line, so anyone can check which OpenCV is doing the vision.
+* **Everything in §4 runs on it:** segmentation, colour, capture checks and the quality model on the new DNN engine,
+  for every inspection on the live site. The benchmark in §8.2 measures the same calls on the same build.
+
+## 9. Agentic vision: a real trace
+
+The award asks for evidence that OpenCV 5 output changes what the agent does next. This is a recorded run from the
+end-to-end evaluation, unedited except for shortening (full file: `docs/traces/avocado-and-mango.jsonl`). The order is
+"An avocado for Saturday's brunch and one mango", on a Thursday, Claude Haiku 4.5:
+
+| t (s) | step | what happened |
+|---|---|---|
+| 2.0 | read_order | the agent passes `eat_on: "Saturday"`; the cell answers "Avocado, eat in 2.0 days; Mango, no timing" |
+| 5.8 | inspect M4 | OpenCV pipeline over several views: clean on everything seen, 43% unseen; validation gate: "A person confirms: for mango this inspection missed 3 of 8 spoiled ones in validation"; routing for line 2: **ask** |
+| 6.0 | inspect A1 | both side photos measured; forecast 4.6 days (3.2–7.0); routing for line 1: **ask** (may not be ripe in 2 days) |
+| 9.3 | ask_person | the agent puts both to the person in one review, but as a general "question" |
+| 11.3 | place M4, place A1 | **refused by the cell**: a general question is not permission to pack; each refusal quotes the vision's reason |
+| 13.4 | ask_person | the agent asks again, now "pack M4 into line 2" and "pack A1 into line 1"; both approved |
+| 15.8 | place | M4 and A1 packed |
+| 18.3 | finish | both lines filled; the hidden labels agree both were right |
+
+Every decision after 5.8 s follows from what the cameras measured: the vision's verdicts and forecast intervals set
+the routings, the routings set what the cell would allow, and the agent's next calls changed to fit. (The first,
+wrong kind of question is the agent's mistake, and the cell's rule caught it.)
+
+## 10. Responsible use
+
+* **People stay in control of what the camera cannot judge.** The cell packs on its own only verdicts validated for
+  that produce; everything else is put to a person with the measured reason and the photos. It never discards a sound
+  item without a person, and a person cannot force a defective item into an order.
+* **No overclaiming.** Each inspection states what was measured and what was not (the uninspected underside, "no
+  shelf-life number for this produce"). The safety result is reported with its dependency on the person (§7.1).
+* **Not a food-safety test.** The cell judges visible quality and ripeness. It does not detect pathogens, residues or
+  internal rot, and it does not replace food-safety checks.
+* **Waste.** Sound items that fit no order line go back to the crate; items near the end of their life are routed to
+  "sell today" rather than the bin.
+* **Privacy.** The camera looks at a turntable; the system stores produce photos, order text and its own decisions,
+  with no accounts and no personal data. Evidence goes to a private S3 bucket with public access blocked.
+* **Security and cost control.** No keys on disk (instance role), the origin accepts only CloudFront, deploys go
+  through Systems Manager without SSH, IAM is scoped to the bucket prefixes and the one Bedrock model, and runs are rate
+  limited per visitor and per day because each one calls a paid model.
+* **Data and models.** Training and test data are public datasets used under their licences and credited below; the
+  model was trained on other regions' produce, and its transfer limits are measured and shown (§4.4).
+* **Work.** The cell is designed to take routine judgement calls off a fast-moving picker and leave the hard ones
+  with them, with evidence, not to remove the human check.
+
+## 11. Limitations
 
 * **Simulation.** The arm and turntable are simulated; the photos are real but recorded. A live camera would add
   lighting and motion I have only synthesised (§4.5).
@@ -338,7 +403,7 @@ about 1.4 s to 0.25 s on the development laptop, with bit-identical output (`tes
   of attempts regardless of seed or threads (the code retries); `ccm` `correctImage` expects BGR while the fit uses RGB, which
   doubled the colour error until I swapped channels.
 
-## 10. Reproducing
+## 12. Reproducing
 
 ```bash
 pip install -r requirements.txt          # pinned: opencv-python 5.0.0.93, numpy 2.4.3, mujoco 3.15.0, ...
@@ -356,6 +421,21 @@ Checked on 20 October 2026 from a fresh export of the repository on Ubuntu 24.04
 pinned requirements: 206 tests pass after `scripts/fetch_so101.py`; the 4 still skipped need the TR-6 photos or the model
 file. The quality model (`models/chhaant_quality_v1.onnx`, 12.9 MB) is trained by `kaggle/train/train.py`; *its download
 link will be added here.* All results quoted are files in `eval/results/`.
+
+## Where each required item is
+
+| Required | Where |
+|---|---|
+| Problem, users | §2, §2.1 |
+| Architecture (OpenCV 5, AWS, COOL, agent) | diagram at the top, `docs/architecture.svg`; agent workflow `docs/agent_workflow.svg` (§3) |
+| OpenCV 5 implementation | §4, `chhaant/vision/` |
+| AWS deployment | §8.1, `deploy/` |
+| Evaluation, failure cases, limitations | §7, §11, `eval/results/` |
+| Responsible use | §10 |
+| Pinned dependencies; build, deploy, test steps | `requirements.txt`, §12, `README.md` |
+| Working endpoint | <https://d1lk9oj2so3zh7.cloudfront.net> |
+| COOL: version, instance, evidence, baseline | §8.2, §8.3, `eval/results/bench_cool.md` |
+| Agentic vision: workflow diagram, trace, task success, failure handling, observability, human control | `docs/agent_workflow.svg`, §9, §7.1, §4.5, §8.1, §6 |
 
 ## Credits
 
