@@ -67,7 +67,8 @@ def one_run(job: dict) -> dict:
     config = os.path.join(run_dir, "mcp.json")
     with open(config, "w") as fh:
         json.dump({"mcpServers": {"chhaant": server}}, fh)
-    env = {**os.environ, **job["aws"], "CLAUDE_CODE_USE_BEDROCK": "1", "AWS_REGION": job["region"],
+    # fresh credentials for every run: a session exported once expires partway through a long eval
+    env = {**os.environ, **aws_env(), "CLAUDE_CODE_USE_BEDROCK": "1", "AWS_REGION": job["region"],
            "ANTHROPIC_SMALL_FAST_MODEL": "global.anthropic.claude-haiku-4-5-20251001-v1:0"}
     cmd = [job["claude"], "--bare", "-p", PROMPT.format(order=text), "--model", job["model"], "--strict-mcp-config",
            "--mcp-config", config, "--tools", "", "--allowedTools", "mcp__chhaant", "--no-session-persistence",
@@ -154,6 +155,7 @@ def main() -> None:
     ap.add_argument("--orders", default="all", help="e.g. 0,3")
     ap.add_argument("--out", default="eval/results/mcp_runs_claude_code")
     ap.add_argument("--claude", default=None, help="path to the Claude Code binary")
+    ap.add_argument("--rerun-errors", action="store_true", help="run again only the runs in --out that ended in an error")
     args = ap.parse_args()
 
     from chhaant.agent.inspectors import CellInspectors
@@ -164,16 +166,25 @@ def main() -> None:
                                 ShelfLife.load(os.path.join(ROOT, "models/shelf_avocado.json")))
     pick = lambda s, n: range(n) if s == "all" else [int(x) for x in s.split(",")]  # noqa: E731
     trace_dir = os.path.join(ROOT, "data", "evals", "mcp_runs", time.strftime("%Y%m%d-%H%M%S"))
-    base = {"trace_dir": trace_dir, "aws": aws_env(), "region": args.region, "model": args.model,
+    base = {"trace_dir": trace_dir, "region": args.region, "model": args.model,
             "claude": args.claude or claude_exe(), "inspectors": inspectors}
-    jobs = [{**base, "crate": c, "order": o} for c in pick(args.crates, len(CRATES)) for o in pick(args.orders, len(ORDERS))]
+    kept, trace_dirs = [], []
+    if args.rerun_errors:
+        with open(args.out + ".json") as fh:
+            prior = json.load(fh)
+        before, trace_dirs = prior["runs"], [prior["traces"]] if isinstance(prior["traces"], str) else prior["traces"]
+        kept = [r for r in before if not r["error"]]
+        pairs = [(r["crate"], r["order"]) for r in before if r["error"]]
+    else:
+        pairs = [(c, o) for c in pick(args.crates, len(CRATES)) for o in pick(args.orders, len(ORDERS))]
+    jobs = [{**base, "crate": c, "order": o} for c, o in pairs]
     with ThreadPoolExecutor(args.workers) as pool:  # the agents run in their own processes; replay is quick
-        rows = list(pool.map(one_run, jobs))
+        rows = kept + list(pool.map(one_run, jobs))
     text, agg = summarise(rows, args.model)
     with open(args.out + ".md", "w", encoding="utf-8") as fh:
         fh.write(text)
     with open(args.out + ".json", "w") as fh:
-        json.dump({"summary": agg, "runs": rows, "traces": trace_dir}, fh, indent=1)
+        json.dump({"summary": agg, "runs": rows, "traces": trace_dirs + [trace_dir]}, fh, indent=1)
     print(text)
 
 
