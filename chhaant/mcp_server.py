@@ -19,7 +19,7 @@ and CHHAANT_UTC_OFFSET_H (the cell's time zone, default 5.5).
 import argparse
 import json
 import os
-from datetime import datetime, timedelta, timezone
+from datetime import date, datetime, timedelta, timezone
 from pathlib import Path
 from typing import Annotated, Literal
 
@@ -236,9 +236,14 @@ def main(argv=None):
     p = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     p.add_argument("--simulated-reviewer", action="store_true",
                    help="answer questions from the dataset labels (marked 'simulated reviewer'), for unattended runs")
+    p.add_argument("--today", type=date.fromisoformat, default=None,
+                   help="the date the cell works on (YYYY-MM-DD), for reproducible runs; default: today in the cell's zone")
+    p.add_argument("--crate", type=json.loads, default=None,
+                   help='serve this one crate whatever seed new_crate gets, e.g. {"seed": 3, "tr6": [["Tomato", 0]], '
+                        '"avocado": [6, 2]} (TR-6 picks as produce and spoiled 0/1, avocados as true days left)')
     args = p.parse_args(argv)
 
-    from chhaant.agent.crate import demo_crate
+    from chhaant.agent.crate import avocado_items, demo_crate, tr6_items
     from chhaant.agent.inspectors import CellInspectors
     from chhaant.decide.shelf import ShelfLife
     from chhaant.robot.faults import DEMO_FAULTS
@@ -250,8 +255,16 @@ def main(argv=None):
                                 ShelfLife.load(env("CHHAANT_SHELF", str(ROOT / "models/shelf_avocado.json"))))
     reviewer = SimulatedReviewer() if args.simulated_reviewer else ClientReviewer({"tr6": tr6, "avocado": avocado})
     cell_tz = timezone(timedelta(hours=float(env("CHHAANT_UTC_OFFSET_H", "5.5"))))
-    desk = Desk(inspectors, lambda seed: demo_crate(tr6, avocado, seed), env("CHHAANT_MCP_RUNS", str(ROOT / "data/mcp_runs")),
-                lambda: datetime.now(cell_tz).date(), reviewer, DEMO_FAULTS)
+    spec = args.crate
+
+    def crate(seed: int):
+        if spec is None:
+            return demo_crate(tr6, avocado, seed)
+        return (tr6_items(tr6, [tuple(pick) for pick in spec.get("tr6", [])], spec["seed"])
+                + avocado_items(avocado, spec.get("avocado", []), spec["seed"]))
+
+    desk = Desk(inspectors, crate, env("CHHAANT_MCP_RUNS", str(ROOT / "data/mcp_runs")),
+                (lambda: args.today) if args.today else (lambda: datetime.now(cell_tz).date()), reviewer, DEMO_FAULTS)
     build_server(desk).run()
 
 
