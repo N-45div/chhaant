@@ -44,7 +44,7 @@ function renderToolResult(tool, input, out) {
     return el;
   }
   if (tool === "look_closer") return li("action", `<div class="head">Looked closer at ${esc(out.item_id)}, ${out.azimuth}°</div>
-      <div class="views"><div class="view"><img src="${photo(out.photo, 152)}" alt="">defect ${out.defect}</div></div>`);
+      <div class="views"><div class="view"><img src="${photo(out.photo, 152)}" alt="${esc(out.item_id)} at ${out.azimuth}°">defect ${out.defect}</div></div>`);
   if (tool === "place") return li("action", `<div class="head">${esc(input.item_id)} → ${esc(out.now)}</div><div class="small">${esc(input.reason || "")}</div>`);
   if (tool === "read_order") return li("action", `<div class="head">Read the order</div>` +
       out.order.map((l) => `<div class="small">line ${l.line}: ${l.quantity} × ${esc(l.produce)}, ${l.eat_in_days == null ? "no timing" : `eaten in ${l.eat_in_days} days`} (${l.in_crate} in crate)</div>`).join(""));
@@ -58,7 +58,7 @@ const unusable = (l) => (l.problem ? `<br><span class="unusable">not used: ${esc
 async function fillViews(itemId, box) {
   const { body } = await api(`/api/runs/${runId}/items/${itemId}`);
   const looks = body.inspection?.looks || [];
-  box.innerHTML = looks.map((l) => `<div class="view"><img src="${photo(l.photo, 152)}" alt="view of ${esc(itemId)}">
+  box.innerHTML = looks.map((l) => `<div class="view"><img src="${photo(l.photo, 152)}" alt="${esc(itemId)}, ${esc(angle(l))}">
     ${angle(l)}${l.defect != null ? `<br>defect ${l.defect}` : ""}${l.ripeness != null ? `<br>ripe ${l.ripeness}` : ""}${unusable(l)}</div>`).join("");
 }
 
@@ -100,10 +100,11 @@ function renderWaiting(waiting) {
     const w = waiting.find((x) => x.request_id === id);
     if (!w || answered.has(id)) { box.innerHTML = ""; return; }
     if (box.childElementCount) return;
-    box.innerHTML = `<input aria-label="note" placeholder="optional note"><button class="yes">Approve</button><button class="no">Decline</button>`;
+    const what = esc(w.item_id);
+    box.innerHTML = `<input aria-label="Note to the agent about ${what} (optional)" placeholder="optional note"><button class="yes" aria-label="Approve ${what}">Approve</button><button class="no" aria-label="Decline ${what}">Decline</button>`;
     const send = async (approved) => {
       answered.add(id);
-      box.innerHTML = `<span class="small">sent…</span>`;
+      box.innerHTML = `<span class="small" role="status">sent…</span>`;
       await api(`/api/runs/${runId}/answer`, { method: "POST", body: JSON.stringify({ request_id: id, approved, answer: box.querySelector("input")?.value || "" }) });
     };
     box.querySelector(".yes").onclick = () => send(true);
@@ -179,7 +180,7 @@ async function openEvidence(itemId) {
       <span>Verdict</span><span>${ins ? `<span class="pill ${esc(ins.verdict)}">${esc(ins.verdict)}</span> ${esc(ins.reason)}` : "not inspected"}</span>
       <span>Measured</span><span>${ins ? esc(ins.capability) : ""}</span>
       <span>Shelf life</span><span>${ins ? esc(fmtForecast(ins.forecast)) : ""} at ${body.storage_temp_c} °C</span></div>
-    <h3>Every photo it used</h3><div class="views">${looks.map((l) => `<div class="view"><img src="${photo(l.photo, 152)}" alt="">${angle(l)}${l.defect != null ? `<br>defect ${l.defect}` : ""}${l.ripeness != null ? `<br>ripe ${l.ripeness}` : ""}${unusable(l)}${l.why ? `<br><i>${esc(l.why)}</i>` : ""}</div>`).join("")}</div>
+    <h3>Every photo it used</h3><div class="views">${looks.map((l) => `<div class="view"><img src="${photo(l.photo, 152)}" alt="${esc(itemId)}, ${esc(angle(l))}">${angle(l)}${l.defect != null ? `<br>defect ${l.defect}` : ""}${l.ripeness != null ? `<br>ripe ${l.ripeness}` : ""}${unusable(l)}${l.why ? `<br><i>${esc(l.why)}</i>` : ""}</div>`).join("")}</div>
     <h3>Questions to a person</h3>${body.requests.map((r) => `<div class="small">${esc(r.id)} ${esc(r.kind)}: ${esc(r.question)} → <b>${esc(r.status)}</b> ${esc(r.answer)} ${r.by ? `(${esc(r.by)})` : ""}</div>`).join("") || `<div class="small muted">none</div>`}
     <h3>Moves</h3>${body.actions.map((a) => `<div class="small">${a.kind === "guardrail" ? `refused: ${esc(a.refused)}` : `${esc(a.destination)}${a.order_line ? ` line ${a.order_line}` : ""}: ${esc(a.reason)}`}</div>`).join("") || `<div class="small muted">none</div>`}`;
   $("#evidence").showModal();

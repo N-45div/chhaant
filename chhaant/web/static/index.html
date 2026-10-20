@@ -8,9 +8,10 @@
   <link rel="stylesheet" href="/static/style.css">
 </head>
 <body>
+  <a class="skip" href="#h-feed">Skip to what the agent is doing</a>
   <header class="top">
     <div>
-      <h1>Chhaant <span class="hi">छाँट</span></h1>
+      <h1>Chhaant <span class="hi" lang="hi">छाँट</span></h1>
       <p class="tag">A robot that picks produce the way a careful shopper does, and asks you when it is not sure.</p>
     </div>
     <span id="backend" class="pill muted">connecting…</span>
@@ -35,7 +36,7 @@
       <div id="crate" class="thumbs"></div>
 
       <button id="run" class="cta">Run the cell</button>
-      <p id="run-note" class="note muted">One run at a time. If one is already running, you will watch it.</p>
+      <p id="run-note" class="note muted" aria-live="polite">One run at a time. If one is already running, you will watch it.</p>
     </section>
 
     <div class="mid">
@@ -45,8 +46,8 @@
         <div class="viewer-bar"><span id="viewer-note" class="small muted">loading the 3D cell…</span><button id="replay" class="link">replay</button></div>
       </section>
       <section class="panel feed-panel" aria-labelledby="h-feed">
-        <h2 id="h-feed">What the agent is doing <span id="status" class="pill muted">idle</span></h2>
-        <ol id="feed" class="feed" aria-live="polite"></ol>
+        <h2 id="h-feed" tabindex="-1">What the agent is doing <span id="status" class="pill muted">idle</span></h2>
+        <ol id="feed" class="feed" role="log" aria-live="polite" aria-labelledby="h-feed"></ol>
       </section>
     </div>
 
