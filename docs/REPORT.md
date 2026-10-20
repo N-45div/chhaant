@@ -14,9 +14,10 @@ Live: <https://d1lk9oj2so3zh7.cloudfront.net> (AWS, Graviton4 with the Cloud-Opt
 
 | What | Result | Where |
 |---|---|---|
-| End to end: wrong items packed for a customer, 32 orders x 2 language models | 22 and 21 at the start, **0 and 0** after four measured iterations | §7.1 |
+| End to end: wrong items packed for a customer, 32 orders x 2 language models | 22 and 21 at the start, **0 and 0** after the measured iterations | §7.1 |
 | End to end: share of what the crate could have filled, packed correctly | 81% / 78% at the start, **96% / 96%** now | §7.1 |
-| Times a person is interrupted per order (the price of the safety) | 1.8 (Claude Haiku 4.5), 2.0 (Nemotron 3 Super) | §7.1 |
+| Times a person is interrupted per order (the price of the safety) | 1.7 (Claude Haiku 4.5), 2.0 (Nemotron 3 Super) | §7.1 |
+| The same 32 orders, driven over MCP by an agent I did not write (Claude Code, Claude Sonnet 4.5) | **0 wrong** in 65 packed, fill 94%; its runs exposed two gaps in my rules, both now fixed | §7.1 |
 | Rotate until sure vs looking at all 16 angles, 312 held-out sessions | **38 wrong calls vs 69**, with 3.95 views instead of 16 | §5.1 |
 | Avocado shelf life from two photos + temperature, 426 held-out fruit | mean error **1.05 days** (temperature alone: 3.45) | §5.2 |
 | Sequential crate acceptance vs the fixed sampling plan | **38–79 items inspected instead of 135**, same risks | §5.4 |
@@ -70,6 +71,16 @@ The cell (top half of the diagram) runs once per order:
 The tools the model sees are `read_order`, `list_crate`, `inspect`, `look_closer`, `ask_person`, `place` and
 `finish` (`chhaant/agent/tools.py`). Two models are supported through the same tools: Claude Haiku 4.5 on Amazon
 Bedrock (the deployment) and NVIDIA Nemotron 3 Super on Nebius Token Factory.
+
+**Bring your own agent (MCP).** The same tools are also an MCP server (`chhaant/mcp_server.py`, `python -m
+chhaant.mcp_server`), so an agent in any MCP client can run the cell. The rules live in the cell, so that agent is
+refused exactly what mine is refused. `ask_person` becomes an MCP elicitation form for the client's person: one form
+per review, with a yes-or-no box per item. An empty box is a no. If the client cannot show the form, or the person
+closes it, the question stays pending, and pending never counts as approval. I tested both ways the MCP SDK delivers
+a form: as a request in the middle of the tool call (protocol 2025-11-25), and as an "input required" reply that the
+client answers and retries (2026-07-28). Headless Claude Code advertises forms but closes them. In that case the cell
+packed nothing, and the agent reported the three questions as waiting for a person. The score against the hidden
+labels is written to disk and never returned to the client's agent.
 
 **Data.** The camera replays real photos: *TriModal Ripeness 6* (TR-6; one fruit each of banana, carrot, guava, Indian
 gooseberry (amla), mango and tomato, photographed daily until spoiled from 16 angles at about 40° elevation plus one
@@ -234,15 +245,18 @@ correctly (a bipartite matching of fit items to order slots).
 I used it as a loop: measure, explain every wrong pack from the trace (`eval/explain_wrong.py`), fix the cause, measure
 again.
 
-| Claude Haiku 4.5 (Bedrock) | baseline | iter 1 | iter 2 | iter 3 | iter 4 |
-|---|---|---|---|---|---|
-| packed wrong | 22 | 0 | 0 | 0 | 0 |
-| fill | 81% | 94% | 93% | 93% | 96% |
-| sound items thrown away | 1 | 3 | 0 | 0 | 0 |
-| times a person is interrupted per order | 1.0 | 3.8 | 2.9 | 2.9 | 1.8 |
-| orders read right | 24/32 | 32/32 | 32/32 | 32/32 | 32/32 |
-| "complete" claimed while a line is short | 4 | 0 | 0 | 0 | 0 |
-| median seconds / cost per order | 29 / $0.029 | 35 / $0.051 | 28 / $0.043 | 24 / $0.043 | 20 / $0.043 |
+| Claude Haiku 4.5 (Bedrock) | baseline | iter 1 | iter 2 | iter 3 | iter 4 | iter 5 |
+|---|---|---|---|---|---|---|
+| packed wrong | 22 | 0 | 0 | 0 | 0 | 0 |
+| fill | 81% | 94% | 93% | 93% | 96% | 96% |
+| sound items thrown away | 1 | 3 | 0 | 0 | 0 | 0 |
+| times a person is interrupted per order | 1.0 | 3.8 | 2.9 | 2.9 | 1.8 | 1.7 |
+| orders read right | 24/32 | 32/32 | 32/32 | 32/32 | 32/32 | 32/32 |
+| "complete" claimed while a line is short | 4 | 0 | 0 | 0 | 0 | 0 |
+| median seconds / cost per order | 29 / $0.029 | 35 / $0.051 | 28 / $0.043 | 24 / $0.043 | 20 / $0.043 | 45* / $0.038 |
+
+\* Iteration 5 ran while the MCP evaluation below was also using Bedrock; the time is mostly throttling back-off, and 2
+runs throttled out and were run again.
 
 | Nemotron 3 Super (Nebius) | baseline | iter 1 | iter 2 | iter 3 | iter 4 |
 |---|---|---|---|---|---|
@@ -265,6 +279,9 @@ What each iteration changed, and the failure that drove it:
 * **Iteration 3.** Nemotron finished with person-approved items still in the crate; finish now refuses that. Bedrock
   throttling had killed 9 of 32 runs; calls now back off adaptively (0 errors since).
 * **Iteration 4.** Batch review: interruptions 2.9 → 1.8 and 2.8 → 2.0 with no loss.
+* **Iteration 5.** A gap found by the outside agent below: marking an item down for sale today now needs its own
+  question, and a yes to a general question permits no move. For Haiku nothing that counts changed (0 wrong, fill 96%,
+  no sound item marked down early).
 
 **With camera faults.** The same 32 orders with the live demo's faults switched on (a motion-blurred view on one
 tomato, glare at every angle on another, one avocado side cut off by the frame):
@@ -293,6 +310,36 @@ signal that could contradict it. The cell still does better than acting on its o
 baseline), but the honest claim is that it puts the decisions it cannot make in front of a person, with the evidence;
 it does not make the person unnecessary.
 
+**An agent I did not write.** The same 32 orders, driven over MCP by Claude Code (`eval/mcp_runs.py`). Claude Code was
+started bare, with none of my instructions beyond the server's own, on Bedrock with Claude Sonnet 4.5, and the chhaant
+MCP server as its only tools. Each run is scored by replaying its trace against a fresh cell, and the replay
+reproduced every tool result the agent saw.
+
+| Claude Code + Sonnet 4.5 over MCP | first run | after the two fixes |
+|---|---|---|
+| packed wrong | 0 of 65 | 0 of 65 |
+| fill | 94% | 94% |
+| sound avocados marked down to sell today with 2 or more days left | 11 | 0 |
+| orders lost to a restarted crate | 3 | 0 |
+| moves the cell refused, per order | 2.2 | 0.7 |
+| times a person is interrupted per order | 3.1 | 2.8 |
+| orders read right | 28/32 | 29/32 |
+| median seconds / cost per order | 84 / $0.125 | 71 / $0.107 |
+
+The rules held for an agent I did not write. The person's time did not: this agent asks about one item at a time more
+often, and interrupts 2.8 times per order where Haiku interrupts 1.7. The safety comes from the cell; the cost in
+interruptions depends on the agent.
+
+Its first run found two gaps in my rules that the built-in agents never hit:
+
+* The cell let a person's yes to any general question count as permission to mark an item down. Eleven sound
+  avocados with 2–7 days left went to sell-today, each on a yes to some other question, such as "Can A2 work for
+  tonight?".
+* My MCP server let `new_crate` replace the crate after the order had been read, so 3 orders were lost.
+
+Both are fixed (§7.2) and covered by tests. The misread orders are all the same one: the model gave "a tomato for a
+sandwich" a timing (tonight or tomorrow), which changes nothing for a tomato.
+
 ### 7.2 Failure cases
 
 Failures I found and what the cell does about them (each is a test in `tests/`):
@@ -308,6 +355,8 @@ Failures I found and what the cell does about them (each is a test in `tests/`):
 | "Saturday" counted as 5 days by a model; "Saturday" on a Saturday read as 7 | end-to-end and live runs | the cell counts; today's weekday means today |
 | Model writes "Order complete" with a line short | end-to-end runs | finish refused until the summary says what is short |
 | Bedrock ThrottlingException ends an order | end-to-end runs | adaptive retries, up to 10 attempts |
+| A yes to a general question let a sound avocado go to sell-today (11 times in 32 orders, 2–7 days left) | Claude Code over MCP | sell-today needs its own question; a general question permits no move |
+| An agent read the order, then started a new crate and lost the order (3 of 32 orders) | Claude Code over MCP | `new_crate` is refused while a job is under way |
 
 ## 8. AWS
 
@@ -405,6 +454,9 @@ wrong kind of question is the agent's mistake, and the cell's rule caught it.)
   camera never sees the underside either.
 * **Small end-to-end set.** 4 crates x 8 orders per model (96 orders with repeats); differences of a few percent
   between iterations are within run-to-run variation.
+* **Questions over MCP are text.** An MCP form holds text and simple fields, so a person answering in an MCP client
+  gets the evidence as text with the photos' file paths, not the photos the web page shows. The server runs locally
+  (stdio); the live site serves the web app, not MCP.
 * **OpenCV 5.0.0 behaviours I worked around:** `mcc::CCheckerDetector` found a perfect synthetic chart in only 40–70%
   of attempts regardless of seed or threads (the code retries); `ccm` `correctImage` expects BGR while the fit uses RGB, which
   doubled the colour error until I swapped channels.
@@ -413,12 +465,14 @@ wrong kind of question is the agent's mistake, and the cell's rule caught it.)
 
 ```bash
 pip install -r requirements.txt          # pinned: opencv-python 5.0.0.93, numpy 2.4.3, mujoco 3.15.0, ...
-pytest                                   # 235 tests
+pytest                                   # 248 tests
 python kaggle/prep/prep.py               # TR-6 photos (range reads from figshare)
 python scripts/fetch_avocado.py          # avocado photos (Mendeley)
 python scripts/fetch_so101.py            # SO-101 model (MuJoCo Menagerie)
 python -m chhaant.web                    # the web app on http://127.0.0.1:8000
+python -m chhaant.mcp_server             # the cell as an MCP server, for any MCP client (§3, README)
 python eval/cell_runs.py --backend bedrock        # the end-to-end evaluation (§7.1)
+python eval/mcp_runs.py                           # the same orders, driven by Claude Code over MCP (§7.1)
 python eval/rotate_until_sure.py ...              # §5.1; every eval/ script documents its inputs
 bash deploy/deploy.sh                    # the AWS stack (needs an AWS login and the COOL subscription)
 ```
@@ -442,6 +496,7 @@ link will be added here.* All results quoted are files in `eval/results/`.
 | Working endpoint | <https://d1lk9oj2so3zh7.cloudfront.net> |
 | COOL: version, instance, evidence, baseline | §8.2, §8.3, `eval/results/bench_cool.md` |
 | Agentic vision: workflow diagram, trace, task success, failure handling, observability, human control | `docs/agent_workflow.svg`, §9, §7.1, §4.5, §8.1, §6 |
+| Agentic orchestration over MCP | §3, §7.1, `chhaant/mcp_server.py`, `eval/mcp_runs.py` |
 
 ## Credits
 
