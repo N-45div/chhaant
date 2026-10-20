@@ -149,3 +149,12 @@ def test_the_simulated_reviewer_answers_unattended_and_is_named_as_such(tmp_path
                             ("ask_person", {"kind": "pack", "question": "Pack it?", "item_id": "T1", "order_line": 1})],
                      answer=accept(T1=False))
     assert out[2]["status"] == "approved" and out[2]["by"] == "simulated reviewer" and not forms
+
+
+def test_new_crate_never_drops_an_order_under_way(tmp_path):
+    # Found over MCP: an agent read the order, then called new_crate "to start the job", and lost the order.
+    desk = desk_for(tmp_path)
+    out, _ = run(desk, [("read_order", {"lines": TOMATOES}), ("new_crate", {"seed": 1}), ("list_crate", {}),
+                        ("new_crate", {"seed": 1, "restart": True}), ("list_crate", {})])
+    assert not out[1]["ok"] and "under way" in out[1]["error"]
+    assert out[2]["order"] and not out[4]["order"]

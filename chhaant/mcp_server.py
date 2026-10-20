@@ -149,6 +149,9 @@ class Desk:
                   today=self.cell.today.isoformat())
         return self.cell
 
+    def under_way(self) -> bool:
+        return self.cell is not None and not self.cell.finished and bool(self.cell.trace.of_kind("tool_call"))
+
     async def run(self, name: str, args: dict, review=None, note: str = "") -> dict:
         async with self.lock:
             cell = self.cell or self.new()
@@ -171,17 +174,24 @@ class Desk:
 
 def build_server(desk: Desk) -> MCPServer:
     instructions = ("Chhaant is a produce-picking cell. The customer's order comes from the person you work with. "
-                    "Call new_crate to start a job (a crate with seed 0 is used if you do not), then work the order "
-                    "with these rules, which the cell enforces in code.\n\n" + system_prompt(desk.today()))
+                    "A crate is ready: start with read_order and work the order with these rules, which the cell "
+                    "enforces in code. Call new_crate only to work a different crate, or after finish.\n\n"
+                    + system_prompt(desk.today()))
     server = MCPServer("chhaant", title="Chhaant picking cell", instructions=instructions)
 
     @server.tool(description=("Start a new job on a fresh crate of real produce photos: three tomatoes, a mango and "
-                              "four avocados (the web app's crate). Returns the crate and today's date."),
+                              "four avocados (the web app's crate). A crate (seed 0) is ready without it. Refused while "
+                              "a job is under way, so an order is never dropped by accident, unless restart is true. "
+                              "Returns the crate and today's date."),
                  annotations=FIXED)
     async def new_crate(seed: Annotated[int, Field(ge=0, le=9999, description="which crate; the same seed is the same crate")] = 0,
                         camera_faults: Annotated[bool, Field(description="spoil some photos with blur, glare and "
-                                                                         "cropping, to see the capture checks work")] = False) -> dict:
+                                                                         "cropping, to see the capture checks work")] = False,
+                        restart: Annotated[bool, Field(description="drop the job under way and start over")] = False) -> dict:
         async with desk.lock:
+            if desk.under_way() and not restart:
+                return {"ok": False, "error": "a job is already under way on this crate (the order is read or items "
+                        "were handled): carry on with it, or call new_crate with restart true to drop it"}
             cell = desk.new(seed, camera_faults)
             return {**cell.list_crate(), "today": f"{cell.today:%A %d %B %Y}"}
 
