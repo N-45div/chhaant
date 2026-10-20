@@ -27,7 +27,7 @@ PYEOF
   shutdown -h now
 }
 
-$PY -m pip install -q boto3==1.42.29
+$PY -m pip install -q boto3==1.42.29 openpyxl==3.1.5  # openpyxl: the avocado labels are an Excel sheet
 trap upload EXIT
 mkdir -p /srv/chhaant/data/tr6 /srv/chhaant/data/avocado /srv/chhaant/models
 cd /srv/chhaant
