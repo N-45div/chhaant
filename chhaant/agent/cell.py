@@ -270,7 +270,8 @@ class Cell:
                 item, line = self.items[req.item_id], lines[req.item_id]
                 if line is None:  # not a pack question: the item's most pressing open line
                     line = next((ln for ln in self.order if ln.produce == item.produce and ln.open), None)
-                truths.append((item.ok_to_pack(line.eat_in_days if line else None), bool(item.truth.get("defective"))))
+                truths.append((item.ok_to_pack(line.eat_in_days if line else None), bool(item.truth.get("defective")),
+                               item.truth.get("days_left")))
             for req, verdict in zip(reqs, self.reviewer.review_many(reqs, truths)):
                 if verdict is None:  # a person did not answer in time: the question stays pending
                     self.trace.log("no_answer", request=req.id)
@@ -312,8 +313,9 @@ class Cell:
             st.location = "reject bin"
         elif destination == "sell_today":
             f = insp["forecast"]
-            if not (f is not None and f.high < 1.0) and not self.queue.approved(item_id, "question"):
-                return self._refuse("place", "sell-today needs a forecast under a day or a person's say-so", item_id=item_id)
+            if not (f is not None and f.high < 1.0) and not self.queue.approved(item_id, "sell_today"):
+                return self._refuse("place", "sell-today needs a forecast under a day, or a person's yes to ask_person "
+                                    "kind 'sell_today' for this item; a general question does not count", item_id=item_id)
             st.location = "sell today"
         self.actuator.move(item_id, destination)
         self.trace.log("action", item_id=item_id, destination=destination, order_line=order_line, reason=reason)
@@ -364,9 +366,12 @@ class Cell:
                 else:
                     packed_bad += 1
         wasted = sum(1 for i, st in self.state.items() if st.location == "reject bin" and not self.items[i].truth.get("defective"))
+        # marked down while it still had two or more days: it could have waited for another order
+        early = sum(1 for i, st in self.state.items() if st.location == "sell today" and not self.items[i].truth.get("defective")
+                    and (self.items[i].truth.get("days_left") or 0) >= 2)
         return {
             "lines_filled": sum(1 for ln in self.order if not ln.open), "lines": len(self.order),
-            "packed_ok": packed_ok, "packed_bad": packed_bad, "wasted_sound_items": wasted,
+            "packed_ok": packed_ok, "packed_bad": packed_bad, "wasted_sound_items": wasted, "sold_early": early,
             "inspected": sum(1 for st in self.state.values() if st.inspection is not None),
             "views": sum((st.inspection or {}).get("side_views") or 0 for st in self.state.values())
                      + sum(len(st.extra_looks) for st in self.state.values()),

@@ -124,6 +124,8 @@ def _title(kind: str, item_id: str, line) -> str:
         return f"Pack {item_id} into order line {line.line}"
     if kind == "reject":
         return f"Discard {item_id}"
+    if kind == "sell_today":
+        return f"Sell {item_id} today, marked down"
     return f"{item_id}: yes"
 
 
@@ -210,7 +212,7 @@ def build_server(desk: Desk) -> MCPServer:
             return None if cell.finished or not ids else desk.reviewer.form(cell, kind, question, ids, order_line)
 
     @server.tool(description=DESCRIPTIONS["ask_person"], annotations=FIXED)
-    async def ask_person(kind: Literal["pack", "reject", "question"], question: str,
+    async def ask_person(kind: Literal["pack", "reject", "sell_today", "question"], question: str,
                          review: Annotated[ElicitationResult[BaseModel], Resolve(review_form)], ctx: Context,
                          item_id: str | None = None, item_ids: list[str] | None = None,
                          order_line: int | None = None) -> dict:

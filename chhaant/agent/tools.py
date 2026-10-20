@@ -28,12 +28,14 @@ TOOLS = [
     {"name": "ask_person",
      "description": ("Ask a person to decide instead of guessing. kind 'pack' asks permission to pack an item its "
                      "routing does not clear into one order line (give order_line; the approval covers that line "
-                     "only); 'reject' asks permission to discard an item that looks sound; 'question' for anything "
-                     "else. To put several items to the person in one review, pass item_ids instead of item_id: "
-                     "they see all of them at once and answer each. The answers may be pending."),
+                     "only); 'reject' asks permission to discard an item that looks sound; 'sell_today' asks "
+                     "permission to mark a sound item down for sale today when its forecast is not already under a "
+                     "day; 'question' for anything else (a yes to a question permits no move). To put several items "
+                     "to the person in one review, pass item_ids instead of item_id: they see all of them at once "
+                     "and answer each. The answers may be pending."),
      "schema": {"type": "object", "properties": {
          "item_id": {"type": "string"}, "item_ids": {"type": "array", "items": {"type": "string"}},
-         "kind": {"type": "string", "enum": ["pack", "reject", "question"]},
+         "kind": {"type": "string", "enum": ["pack", "reject", "sell_today", "question"]},
          "question": {"type": "string"}, "order_line": {"type": ["integer", "null"]}},
                 "required": ["kind", "question"]}},
     {"name": "place",

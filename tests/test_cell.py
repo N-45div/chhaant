@@ -270,3 +270,23 @@ def test_an_escalated_item_says_why_a_person_decides():
     c.read_order([{"produce": "tomato", "quantity": 1, "eat_in_days": None}])
     r = c.inspect("T1")["routing_for_open_lines"][0]
     assert r["action"] == "ask" and r["reason"].startswith("A person confirms: for tomato this inspection missed")
+
+
+def test_a_yes_to_a_general_question_does_not_mark_an_item_down(cell):
+    # Found by an outside agent over MCP: "Can A2 work for tonight?" answered yes let A1 go to sell-today.
+    cell.inspect("A1")
+    cell.queue.answer(cell.queue.ask("A1", "question", "Can A2 work for tonight? A1 seems firm.", {}).id, True, "yes", by="test")
+    r = cell.place("A1", "sell_today")
+    assert not r["ok"] and "sell_today" in r["error"]
+    cell.queue.answer(cell.queue.ask("A1", "sell_today", "Mark A1 down for today?", {}).id, True, "yes", by="test")
+    assert cell.place("A1", "sell_today")["ok"]
+    assert cell.score()["sold_early"] == 1  # 5 true days left: it could have waited for another order
+
+
+def test_the_simulated_reviewer_is_asked_with_the_days_left():
+    items = [CrateItem("A1", "Avocado", "avocado", 20.0, truth={"defective": False, "days_left": 6.0})]
+    c = Cell(items, FakeInspectors({"A1": inspection("clean", Forecast(4.5, 3.1, 6.8))}), reviewer=SimulatedReviewer())
+    c.read_order([{"produce": "Avocado", "quantity": 1, "eat_in_days": 0.5}])
+    c.inspect("A1")
+    assert c.ask_person("A1", "sell_today", "Too firm for tonight; sell it today?")["status"] == "declined"
+    assert not c.place("A1", "sell_today")["ok"]

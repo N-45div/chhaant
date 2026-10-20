@@ -102,3 +102,12 @@ def test_an_unanswered_item_in_a_batch_stays_pending():
     threading.Timer(0.05, lambda: person.answer("Q1", True, "")).start()
     out = person.review_many(reqs)
     assert out[0] == (True, "") and out[1] is None
+
+
+def test_simulated_reviewer_marks_down_only_a_sound_item_near_its_end():
+    req = ApprovalQueue().ask("A1", "sell_today", "Sell it today?", {})
+    sim = SimulatedReviewer()
+    assert sim.review(req, False, False, 0.5)[0] is True
+    assert sim.review(req, False, False, 6.0)[0] is False
+    assert sim.review(req, False, True, 0.5)[0] is False   # spoiled: not for sale
+    assert sim.review(req, True, False, None)[0] is False  # no shelf-life truth (TR-6): keep it

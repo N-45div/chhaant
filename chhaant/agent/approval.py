@@ -3,7 +3,8 @@
 The agent may ask a person instead of guessing (an undecided inspection, a
 shelf life that straddles the eat-by day). A request stays pending until
 someone answers it. Some moves (packing an undecided item, discarding a sound
-one) are refused until a person has approved them.
+one, marking one down for sale today early) are refused until a person has
+approved that move; a yes to a general question approves none of them.
 
 ``SimulatedReviewer`` answers from the dataset's own labels so whole runs can
 be scored without a human in the loop; anything it answers is marked
@@ -27,7 +28,7 @@ from datetime import datetime, timezone
 class Request:
     id: str
     item_id: str
-    kind: str                 # "pack", "reject" or "question"
+    kind: str                 # "pack", "reject", "sell_today" or "question"
     question: str
     evidence: dict
     status: str = "pending"   # "pending", "approved", "declined"
@@ -37,6 +38,9 @@ class Request:
     answered_at: str = ""
     order_line: int | None = None  # for "pack": the line it may be packed into, and only that one
     batch: str | None = None       # requests a person reviews together, in one glance
+
+
+KINDS = ("pack", "reject", "sell_today", "question")
 
 
 class ApprovalQueue:
@@ -50,7 +54,7 @@ class ApprovalQueue:
 
     def ask(self, item_id: str, kind: str, question: str, evidence: dict, order_line: int | None = None,
             batch: str | None = None) -> Request:
-        if kind not in ("pack", "reject", "question"):
+        if kind not in KINDS:
             raise ValueError(f"unknown request kind: {kind}")
         req = Request(f"Q{next(self._ids)}", item_id, kind, question, evidence, order_line=order_line, batch=batch)
         self.requests.append(req)
@@ -91,16 +95,20 @@ class SimulatedReviewer:
 
     name = "simulated reviewer"
 
-    def review(self, req: Request, truth_ok_to_pack: bool, truth_defective: bool | None = None) -> tuple[bool, str]:
+    def review(self, req: Request, truth_ok_to_pack: bool, truth_defective: bool | None = None,
+               truth_days_left: float | None = None) -> tuple[bool, str]:
         if req.kind == "pack":
             return truth_ok_to_pack, "fine to pack" if truth_ok_to_pack else "do not pack this one"
         if req.kind == "reject":  # discard only what is spoiled; a sound item that suits no line goes back
             spoiled = (not truth_ok_to_pack) if truth_defective is None else truth_defective
             return spoiled, "discard it" if spoiled else "keep it, it is sound: put it back in the crate"
+        if req.kind == "sell_today":  # mark down only a sound item within about a day of its end
+            near_end = not truth_defective and truth_days_left is not None and truth_days_left <= 1.0
+            return near_end, "sell it today" if near_end else "do not mark it down: put it back in the crate"
         return True, "fine to pack" if truth_ok_to_pack else "not fit for this order"
 
-    def review_many(self, reqs: list[Request], truths: list[tuple[bool, bool | None]]) -> list[tuple[bool, str]]:
-        return [self.review(r, ok, bad) for r, (ok, bad) in zip(reqs, truths)]
+    def review_many(self, reqs: list[Request], truths: list[tuple]) -> list[tuple[bool, str]]:
+        return [self.review(r, *t) for r, t in zip(reqs, truths)]
 
 
 class PersonReviewer:
