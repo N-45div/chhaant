@@ -82,6 +82,15 @@ client answers and retries (2026-07-28). Headless Claude Code advertises forms b
 packed nothing, and the agent reported the three questions as waiting for a person. The score against the hidden
 labels is written to disk and never returned to the client's agent.
 
+The live site hosts the same server at `/mcp`, so a judge's own agent can run the cell with one command:
+`claude mcp add --transport http chhaant https://d1lk9oj2so3zh7.cloudfront.net/mcp`. The newest protocol keeps no
+session between calls, so each `new_crate` opens a job with a crate of its own, and its id goes with every later
+call. Visitors never share a crate. Idle jobs close after 30 minutes, and open jobs, new jobs per address and calls
+per job are capped. The client can choose who answers: its own person through forms, whose photos are links to the
+live site, or the simulated reviewer. Finished jobs go to S3 with their own CloudWatch metric, like the web runs.
+Checked on the live site on 21 October: the SDK's client on both protocols through CloudFront, and a Claude Code run
+whose job packed 3 items, all right against the hidden labels.
+
 **Data.** The camera replays real photos: *TriModal Ripeness 6* (TR-6; one fruit each of banana, carrot, guava, Indian
 gooseberry (amla), mango and tomato, photographed daily until spoiled from 16 angles at about 40° elevation plus one
 overhead view, 3 sessions a day, 5,338 photos) and the *Hass avocado ripening dataset* (478 fruit at 10 °C, 20 °C and
@@ -455,8 +464,8 @@ wrong kind of question is the agent's mistake, and the cell's rule caught it.)
 * **Small end-to-end set.** 4 crates x 8 orders per model (96 orders with repeats); differences of a few percent
   between iterations are within run-to-run variation.
 * **Questions over MCP are text.** An MCP form holds text and simple fields, so a person answering in an MCP client
-  gets the evidence as text with the photos' file paths, not the photos the web page shows. The server runs locally
-  (stdio); the live site serves the web app, not MCP.
+  gets the evidence as text with links to the photos (file paths on a local server), not the photos inline as the web
+  page shows them.
 * **OpenCV 5.0.0 behaviours I worked around:** `mcc::CCheckerDetector` found a perfect synthetic chart in only 40–70%
   of attempts regardless of seed or threads (the code retries); `ccm` `correctImage` expects BGR while the fit uses RGB, which
   doubled the colour error until I swapped channels.
@@ -465,7 +474,7 @@ wrong kind of question is the agent's mistake, and the cell's rule caught it.)
 
 ```bash
 pip install -r requirements.txt          # pinned: opencv-python 5.0.0.93, numpy 2.4.3, mujoco 3.15.0, ...
-pytest                                   # 248 tests
+pytest                                   # 255 tests
 python kaggle/prep/prep.py               # TR-6 photos (range reads from figshare)
 python scripts/fetch_avocado.py          # avocado photos (Mendeley)
 python scripts/fetch_so101.py            # SO-101 model (MuJoCo Menagerie)
@@ -477,8 +486,8 @@ python eval/rotate_until_sure.py ...              # §5.1; every eval/ script do
 bash deploy/deploy.sh                    # the AWS stack (needs an AWS login and the COOL subscription)
 ```
 
-Checked on 20 October 2026 from a fresh export of the repository on Ubuntu 24.04 (WSL) with Python 3.12 and only the
-pinned requirements: 206 tests pass after `scripts/fetch_so101.py`; the 4 still skipped need the TR-6 photos or the model
+Checked on 21 October 2026 from a fresh export of the repository on Ubuntu 24.04 (WSL) with Python 3.12 and only the
+pinned requirements: 224 tests pass after `scripts/fetch_so101.py`; the 4 still skipped need the TR-6 photos or the model
 file. The quality model (`models/chhaant_quality_v1.onnx`, 12.9 MB) is trained by `kaggle/train/train.py`; *its download
 link will be added here.* All results quoted are files in `eval/results/`.
 
@@ -493,7 +502,7 @@ link will be added here.* All results quoted are files in `eval/results/`.
 | Evaluation, failure cases, limitations | §7, §11, `eval/results/` |
 | Responsible use | §10 |
 | Pinned dependencies; build, deploy, test steps | `requirements.txt`, §12, `README.md` |
-| Working endpoint | <https://d1lk9oj2so3zh7.cloudfront.net> |
+| Working endpoint | <https://d1lk9oj2so3zh7.cloudfront.net>, and MCP at <https://d1lk9oj2so3zh7.cloudfront.net/mcp> |
 | COOL: version, instance, evidence, baseline | §8.2, §8.3, `eval/results/bench_cool.md` |
 | Agentic vision: workflow diagram, trace, task success, failure handling, observability, human control | `docs/agent_workflow.svg`, §9, §7.1, §4.5, §8.1, §6 |
 | Agentic orchestration over MCP | §3, §7.1, `chhaant/mcp_server.py`, `eval/mcp_runs.py` |
