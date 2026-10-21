@@ -38,6 +38,8 @@ cat > /etc/chhaant.env <<EOF
 AWS_REGION=$AWS_REGION
 CHHAANT_EVIDENCE_BUCKET=$CHHAANT_BUCKET
 CHHAANT_BEDROCK_MODEL=${CHHAANT_BEDROCK_MODEL:-global.anthropic.claude-haiku-4-5-20251001-v1:0}
+CHHAANT_PUBLIC_URL=${CHHAANT_PUBLIC_URL:-}
+CHHAANT_MCP_RUNS=/srv/chhaant/data/mcp_runs
 EOF
 install -m 644 deploy/chhaant.service /etc/systemd/system/chhaant.service
 systemctl daemon-reload

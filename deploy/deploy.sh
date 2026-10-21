@@ -36,11 +36,13 @@ fi
 if [ "${1:-}" = "update" ]; then
   INSTANCE=$(aws cloudformation describe-stacks --stack-name "$STACK" --region "$REGION" \
     --query "Stacks[0].Outputs[?OutputKey=='InstanceId'].OutputValue" --output text)
+  URL=$(aws cloudformation describe-stacks --stack-name "$STACK" --region "$REGION" \
+    --query "Stacks[0].Outputs[?OutputKey=='Url'].OutputValue" --output text)  # MCP forms link photos here
   aws ssm send-command --region "$REGION" --instance-ids "$INSTANCE" --document-name AWS-RunShellScript \
     --comment "chhaant update $(git rev-parse --short HEAD)" --parameters commands="[
       \"/opt/cool/venvs/python_3.12/bin/python -c \\\"import boto3; boto3.client('s3', region_name='$REGION').download_file('$BUCKET', 'artifacts/chhaant.tar.gz', '/tmp/chhaant.tar.gz')\\\"\",
       \"tar xzf /tmp/chhaant.tar.gz -C /srv/chhaant\",
-      \"CHHAANT_BUCKET=$BUCKET AWS_REGION=$REGION bash /srv/chhaant/deploy/bootstrap.sh\"]" --query "Command.CommandId" --output text
+      \"CHHAANT_BUCKET=$BUCKET AWS_REGION=$REGION CHHAANT_PUBLIC_URL=$URL bash /srv/chhaant/deploy/bootstrap.sh\"]" --query "Command.CommandId" --output text
   exit 0
 fi
 
