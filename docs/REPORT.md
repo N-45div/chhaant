@@ -488,8 +488,8 @@ bash deploy/deploy.sh                    # the AWS stack (needs an AWS login and
 ```
 
 Checked on 21 October 2026 from a fresh export of the repository on Ubuntu 24.04 (WSL) with Python 3.12 and only the
-pinned requirements: 224 tests pass after `scripts/fetch_so101.py`; the 4 still skipped need the TR-6 photos or the model
-file. The quality model (`models/chhaant_quality_v1.onnx`, 12.9 MB) is trained by `kaggle/train/train.py` and published as
+pinned requirements: 227 tests pass after `scripts/fetch_so101.py` and `scripts/fetch_model.py`; the 1 still skipped
+needs the TR-6 photos. The quality model (`models/chhaant_quality_v1.onnx`, 12.9 MB) is trained by `kaggle/train/train.py` and published as
 the [`model-v1` release](https://github.com/N-45div/chhaant/releases/tag/model-v1), with the reference crops its parity
 test needs (`scripts/fetch_model.py` downloads both and checks their SHA-256). All results quoted are files in
 `eval/results/`.
