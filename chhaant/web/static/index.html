@@ -37,6 +37,14 @@
 
       <button id="run" class="cta">Run the cell</button>
       <p id="run-note" class="note muted" aria-live="polite">One run at a time. If one is already running, you will watch it.</p>
+
+      <details class="byo">
+        <summary>Bring your own agent (MCP)</summary>
+        <p class="note">Any MCP client can work this cell with its own agent, under the same rules. For Claude Code:</p>
+        <code id="mcp-cmd">claude mcp add --transport http chhaant /mcp</code>
+        <p class="note muted">Start with new_crate. The cell's questions come to you as forms, or pass answers "simulated"
+          to have the datasets' labels answer them.</p>
+      </details>
     </section>
 
     <div class="mid">

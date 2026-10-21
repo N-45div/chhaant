@@ -193,6 +193,7 @@ document.addEventListener("click", (e) => {
 $("#run").addEventListener("click", start);
 
 (async function init() {
+  $("#mcp-cmd").textContent = `claude mcp add --transport http chhaant ${location.origin}/mcp`;
   const health = await api("/api/health");
   $("#backend").textContent = health.ok ? health.body.backend || "ready" : "offline";
   loadCrate();
