@@ -15,7 +15,7 @@ MODEL = os.path.join(ROOT, "models", "chhaant_quality_v1.onnx")
 REFERENCE = os.path.join(ROOT, "models", "reference.npz")
 
 pytestmark = pytest.mark.skipif(not (os.path.exists(MODEL) and os.path.exists(REFERENCE)),
-                                reason="model not downloaded into models/")
+                                reason="model not downloaded into models/ (python scripts/fetch_model.py)")
 
 
 @pytest.mark.parametrize("engine", ["new", "classic"])
