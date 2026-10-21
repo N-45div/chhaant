@@ -28,6 +28,7 @@ Python 3.12 and OpenCV 5:
 python -m venv .venv
 .venv/Scripts/activate        # Windows; use .venv/bin/activate elsewhere
 pip install -r requirements.txt
+python scripts/fetch_model.py # the quality model, from the model-v1 release
 pytest
 ```
 

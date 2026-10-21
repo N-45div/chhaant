@@ -478,6 +478,7 @@ pytest                                   # 255 tests
 python kaggle/prep/prep.py               # TR-6 photos (range reads from figshare)
 python scripts/fetch_avocado.py          # avocado photos (Mendeley)
 python scripts/fetch_so101.py            # SO-101 model (MuJoCo Menagerie)
+python scripts/fetch_model.py            # the quality model + its PyTorch reference (GitHub Release, SHA-256 checked)
 python -m chhaant.web                    # the web app on http://127.0.0.1:8000
 python -m chhaant.mcp_server             # the cell as an MCP server, for any MCP client (§3, README)
 python eval/cell_runs.py --backend bedrock        # the end-to-end evaluation (§7.1)
@@ -488,8 +489,10 @@ bash deploy/deploy.sh                    # the AWS stack (needs an AWS login and
 
 Checked on 21 October 2026 from a fresh export of the repository on Ubuntu 24.04 (WSL) with Python 3.12 and only the
 pinned requirements: 224 tests pass after `scripts/fetch_so101.py`; the 4 still skipped need the TR-6 photos or the model
-file. The quality model (`models/chhaant_quality_v1.onnx`, 12.9 MB) is trained by `kaggle/train/train.py`; *its download
-link will be added here.* All results quoted are files in `eval/results/`.
+file. The quality model (`models/chhaant_quality_v1.onnx`, 12.9 MB) is trained by `kaggle/train/train.py` and published as
+the [`model-v1` release](https://github.com/N-45div/chhaant/releases/tag/model-v1), with the reference crops its parity
+test needs (`scripts/fetch_model.py` downloads both and checks their SHA-256). All results quoted are files in
+`eval/results/`.
 
 ## Where each required item is
 
