@@ -10,7 +10,7 @@ from mcp import Client
 from chhaant.agent.approval import SimulatedReviewer
 from chhaant.agent.crate import CrateItem
 from chhaant.decide.forecast import Forecast
-from chhaant.mcp_server import ClientReviewer, Desk, build_server
+from chhaant.mcp_server import ClientReviewer, Desk, Jobs, build_server, hosted
 
 
 class FakeInspectors:
@@ -51,6 +51,10 @@ def desk_for(tmp_path, reviewer=None):
     return Desk(FakeInspectors(RESULTS), crate, str(tmp_path), lambda: date(2026, 10, 22), reviewer)  # a Thursday
 
 
+def server_for(desk):
+    return build_server(Jobs(lambda job, answers: desk), desk.today)
+
+
 def run(desk, steps, answer=None, mode="auto"):
     """Drive the server with an in-process MCP client; ``answer`` fills in each form (None: no form support)."""
     forms = []
@@ -61,7 +65,7 @@ def run(desk, steps, answer=None, mode="auto"):
 
     async def go():
         out = []
-        async with Client(build_server(desk), elicitation_callback=on_form if answer else None, mode=mode) as c:
+        async with Client(server_for(desk), elicitation_callback=on_form if answer else None, mode=mode) as c:
             for name, args in steps:
                 r = await c.call_tool(name, args)
                 out.append(json.loads(r.content[0].text))
@@ -76,7 +80,7 @@ def accept(**ticks):
 
 def test_the_client_sees_the_cell_tools_and_no_hidden_review_argument(tmp_path):
     async def go():
-        async with Client(build_server(desk_for(tmp_path))) as c:
+        async with Client(server_for(desk_for(tmp_path))) as c:
             return {t.name: t for t in (await c.list_tools()).tools}, c.instructions
 
     tools, instructions = anyio.run(go)
@@ -158,3 +162,83 @@ def test_new_crate_never_drops_an_order_under_way(tmp_path):
                         ("new_crate", {"seed": 1, "restart": True}), ("list_crate", {})])
     assert not out[1]["ok"] and "under way" in out[1]["error"]
     assert out[2]["order"] and not out[4]["order"]
+
+
+def hosted_for(tmp_path, **kw):
+    return hosted(FakeInspectors(RESULTS), crate, str(tmp_path), lambda: date(2026, 10, 22),
+                  {"tr6": "data/tr6", "avocado": "data/avocado"}, photo_url="https://cell.example/", **kw)
+
+
+def call_all(server, steps, answer=None):
+    async def on_form(context, params):
+        return answer(params)
+
+    async def go():
+        out = []
+        async with Client(server, elicitation_callback=on_form if answer else None) as c:
+            for step in steps:
+                name, args = step(out) if callable(step) else step
+                out.append(json.loads((await c.call_tool(name, args)).content[0].text))
+        return out
+    return anyio.run(go)
+
+
+def test_hosted_jobs_are_separate_and_the_job_id_is_needed(tmp_path):
+    job = lambda i: lambda out: out[i]["job"]  # noqa: E731
+    out = call_all(hosted_for(tmp_path), [
+        ("new_crate", {}), ("new_crate", {}),
+        lambda out: ("read_order", {"lines": TOMATOES, "job": out[0]["job"]}),
+        lambda out: ("list_crate", {"job": job(1)(out)}),
+        ("list_crate", {}), ("list_crate", {"job": "nope"})])
+    assert out[0]["job"] != out[1]["job"]
+    assert out[2]["ok"] and not out[3]["order"]  # the second job does not see the first job's order
+    assert "job id" in out[4]["error"] and "no open job" in out[5]["error"]
+
+
+def test_hosted_limits_close_idle_jobs_and_cap_new_ones(tmp_path):
+    out = call_all(hosted_for(tmp_path, per_ip_per_hour=2), [("new_crate", {}), ("new_crate", {}), ("new_crate", {})])
+    assert out[0]["ok"] and out[1]["ok"] and "an hour" in out[2]["error"]
+    out = call_all(hosted_for(tmp_path, max_jobs=1, idle_s=3600), [("new_crate", {}), ("new_crate", {})])
+    assert "limit of 1 open jobs" in out[1]["error"]
+    now = [0.0]
+
+    def later(out):
+        now[0] += 61  # a minute passes
+        return "new_crate", {}
+
+    out = call_all(hosted_for(tmp_path, max_jobs=1, idle_s=60, clock=lambda: now[0]), [
+        ("new_crate", {}), later, lambda out: ("list_crate", {"job": out[0]["job"]})])
+    assert out[1]["ok"] and "no open job" in out[2]["error"]  # the idle one was closed to make room
+
+
+def test_hosted_form_links_the_photos_and_simulated_answers_need_nobody(tmp_path):
+    forms = []
+
+    def tick(params):
+        forms.append(params)
+        return types.ElicitResult(action="accept", content={"T1": True, "note": ""})
+
+    out = call_all(hosted_for(tmp_path), [
+        ("new_crate", {}),
+        lambda out: ("read_order", {"lines": TOMATOES, "job": out[0]["job"]}),
+        lambda out: ("inspect", {"item_id": "T1", "job": out[0]["job"]}),
+        lambda out: ("ask_person", {"kind": "pack", "question": "Pack?", "item_id": "T1", "order_line": 1, "job": out[0]["job"]}),
+        ("new_crate", {"answers": "simulated"}),
+        lambda out: ("read_order", {"lines": TOMATOES, "job": out[4]["job"]}),
+        lambda out: ("inspect", {"item_id": "T1", "job": out[4]["job"]}),
+        lambda out: ("ask_person", {"kind": "pack", "question": "Pack?", "item_id": "T1", "order_line": 1, "job": out[4]["job"]})],
+        answer=tick)
+    assert out[3]["status"] == "approved" and out[3]["by"] == "person via MCP client"
+    assert "https://cell.example/api/photo?ref=tr6%3ATomato/a.jpg&w=512" in forms[0].message
+    assert out[4]["answers"] == "simulated reviewer" and out[7]["by"] == "simulated reviewer" and len(forms) == 1
+
+
+def test_hosted_job_caps_its_calls_but_can_always_finish_and_is_archived(tmp_path):
+    archived = []
+    out = call_all(hosted_for(tmp_path, max_calls=2, on_finish=archived.append), [
+        ("new_crate", {}),
+        lambda out: ("list_crate", {"job": out[0]["job"]}), lambda out: ("list_crate", {"job": out[0]["job"]}),
+        lambda out: ("list_crate", {"job": out[0]["job"]}),
+        lambda out: ("finish", {"summary": "Nothing ordered.", "job": out[0]["job"]})])
+    assert out[2]["ok"] and "2 tool calls" in out[3]["error"]
+    assert out[4]["ok"] and len(archived) == 1 and os.path.exists(os.path.join(archived[0], "score.json"))
