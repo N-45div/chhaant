@@ -64,3 +64,16 @@ def test_a_camera_faults_demo_never_feeds_the_camera_alarm(tmp_path):
     assert alarm_feed(cw.calls) == []
     assert any(m["MetricName"] == "UnusablePhotos" and "Dimensions" in m for m in cw.calls[-1][1])  # still on the dashboard
 
+
+def test_a_finished_mcp_job_goes_to_s3_with_its_own_metrics(tmp_path):
+    d = tmp_path / "20261021T101500Z-seed0-abc"
+    d.mkdir()
+    (d / "trace.jsonl").write_text("{}\n")
+    (d / "score.json").write_text('{"refused_moves": 3}')
+    s3, cw = StubS3(), StubCloudWatch()
+    AwsReporter("bucket", "ap-south-1", s3=s3, cloudwatch=cw).mcp_job(str(d))
+    assert s3.uploads == [("bucket", "runs/mcp/20261021T101500Z-seed0-abc/trace.jsonl"),
+                          ("bucket", "runs/mcp/20261021T101500Z-seed0-abc/score.json")]
+    metrics = {m["MetricName"]: m for m in cw.calls[0][1]}
+    assert metrics["McpJobs"]["Value"] == 1 and metrics["RefusedMoves"]["Value"] == 3
+    assert metrics["RefusedMoves"]["Dimensions"] == [{"Name": "Source", "Value": "mcp"}]  # not the web runs' alarm

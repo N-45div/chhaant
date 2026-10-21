@@ -10,6 +10,7 @@ alarm covers every run; a camera-faults demo run (photos spoiled on purpose)
 leaves UnusablePhotos out of that copy, so a visitor's demo never pages anyone.
 """
 
+import json
 import logging
 import os
 
@@ -37,6 +38,27 @@ class AwsReporter:
             self.cloudwatch.put_metric_data(Namespace=self.namespace, MetricData=self.metrics(run))
         except Exception as err:
             log.warning("metrics failed for %s: %s", run.id, err)
+
+    def mcp_job(self, run_dir: str) -> None:
+        """A finished job on the hosted MCP server: trace and score to S3, a count and its refusals to CloudWatch."""
+        name = os.path.basename(os.path.normpath(run_dir))
+        try:
+            for f in ("trace.jsonl", "score.json"):
+                path = os.path.join(run_dir, f)
+                if os.path.exists(path):
+                    self.s3.upload_file(path, self.bucket, f"runs/mcp/{name}/{f}")
+        except Exception as err:
+            log.warning("evidence upload failed for MCP job %s: %s", name, err)
+        try:
+            with open(os.path.join(run_dir, "score.json"), encoding="utf-8") as fh:
+                score = json.load(fh)
+            dims = [{"Name": "Source", "Value": "mcp"}]
+            self.cloudwatch.put_metric_data(Namespace=self.namespace, MetricData=[
+                {"MetricName": "McpJobs", "Value": 1.0, "Unit": "Count", "Dimensions": dims},
+                {"MetricName": "RefusedMoves", "Value": float(score.get("refused_moves", 0)), "Unit": "Count",
+                 "Dimensions": dims}])
+        except Exception as err:
+            log.warning("metrics failed for MCP job %s: %s", name, err)
 
     @staticmethod
     def metrics(run) -> list[dict]:
