@@ -499,7 +499,7 @@ test needs (`scripts/fetch_model.py` downloads both and checks their SHA-256). A
 | Required | Where |
 |---|---|
 | Problem, users | §2, §2.1 |
-| Architecture (OpenCV 5, AWS, COOL, agent) | diagram at the top, `docs/architecture.svg`; agent workflow `docs/agent_workflow.svg` (§3) |
+| Architecture (OpenCV 5, AWS, COOL, agent) | diagram at the top, `docs/architecture.svg`; agent workflow `docs/agent_workflow.svg` (§3); the code map in `ARCHITECTURE.md` |
 | OpenCV 5 implementation | §4, `chhaant/vision/` |
 | AWS deployment | §8.1, `deploy/` |
 | Evaluation, failure cases, limitations | §7, §11, `eval/results/` |
