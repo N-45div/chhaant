@@ -49,13 +49,23 @@ to answer the agent's questions yourself: it waits for your answer.
 
 ## Bring your own agent (MCP)
 
-The cell is also an MCP server, so an agent in any MCP client can work the crate:
+The cell is also an MCP server, so an agent in any MCP client can work the crate.
+The live site hosts it, so nothing needs installing:
+
+```bash
+claude mcp add --transport http chhaant https://d1lk9oj2so3zh7.cloudfront.net/mcp
+```
+
+There, `new_crate` opens a job of your own and returns a job id that goes with
+every other call. Pass `answers: "simulated"` to have the datasets' labels answer
+the cell's questions when nobody is there to answer them. Jobs close after 30
+idle minutes. Or run it locally over stdio from a checkout:
 
 ```bash
 claude mcp add chhaant -e PYTHONPATH=$PWD -- $PWD/.venv/bin/python -m chhaant.mcp_server
 ```
 
-Any other client can start the same command over stdio. The tools are the cell's
+The tools are the cell's
 own (`read_order`, `list_crate`, `inspect`, `look_closer`, `ask_person`, `place`,
 `finish`, plus `new_crate`), and the rules stay in the cell: a client's agent is
 refused exactly what the built-in agent is refused. `ask_person` reaches the
