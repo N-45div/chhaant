@@ -12,8 +12,10 @@
     GET  /api/sim/meshes                 the arm's simplified meshes (static, cacheable)
     GET  /api/runs/{id}/sim/scene        the run's 3D twin: geoms, moving bodies, start poses
     GET  /api/runs/{id}/sim?after=N      twin body poses from frame N, with captions
+    POST /mcp                            the cell as an MCP server (streamable HTTP), when one is given
 """
 
+import contextlib
 import os
 import platform
 from functools import lru_cache
@@ -59,8 +61,22 @@ def safe_photo_path(ref: str, roots: dict[str, str]) -> str:
 
 
 def create_app(manager: RunManager, photo_roots: dict[str, str], crate_preview, backend_name: str = "",
-               sim_meshes=None) -> FastAPI:
-    app = FastAPI(title="Chhaant", docs_url=None, redoc_url=None)
+               sim_meshes=None, mcp=None) -> FastAPI:
+    lifespan, mcp_routes = None, []
+    if mcp is not None:  # chhaant.mcp_server.hosted(): its session manager lives as long as the app
+        from mcp.server.transport_security import TransportSecuritySettings
+        # DNS-rebinding protection guards servers on localhost; this one is public, behind CloudFront, with no
+        # cookies or credentials to steal, and CloudFront rewrites the Host header the check would test.
+        mcp_routes = mcp.streamable_http_app(streamable_http_path="/mcp", host="0.0.0.0", max_sessions=200,
+                                             transport_security=TransportSecuritySettings(
+                                                 enable_dns_rebinding_protection=False)).routes
+
+        @contextlib.asynccontextmanager
+        async def lifespan(app):
+            async with mcp.session_manager.run():
+                yield
+    app = FastAPI(title="Chhaant", docs_url=None, redoc_url=None, lifespan=lifespan)
+    app.router.routes.extend(mcp_routes)
     app.add_middleware(GZipMiddleware, minimum_size=1000)
     # Which OpenCV build is doing the vision: on the COOL AMI the HAL line names KleidiCV.
     build = {line.split(":", 1)[0].strip(): line.split(":", 1)[1].strip()

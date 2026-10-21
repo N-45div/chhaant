@@ -242,3 +242,46 @@ def test_hosted_job_caps_its_calls_but_can_always_finish_and_is_archived(tmp_pat
         lambda out: ("finish", {"summary": "Nothing ordered.", "job": out[0]["job"]})])
     assert out[2]["ok"] and "2 tool calls" in out[3]["error"]
     assert out[4]["ok"] and len(archived) == 1 and os.path.exists(os.path.join(archived[0], "score.json"))
+
+
+def test_the_web_app_serves_mcp_over_http_on_both_protocols(tmp_path):
+    import socket
+    import threading
+    import time
+
+    import uvicorn
+
+    from chhaant.web.app import create_app
+    from chhaant.web.runs import RunManager
+
+    app = create_app(RunManager(None, None, str(tmp_path / "runs")), {}, lambda seed: [], "test", None, hosted_for(tmp_path))
+    with socket.socket() as s:
+        s.bind(("127.0.0.1", 0))
+        port = s.getsockname()[1]
+    server = uvicorn.Server(uvicorn.Config(app, host="127.0.0.1", port=port, log_level="warning"))
+    thread = threading.Thread(target=server.run, daemon=True)
+    thread.start()
+    while not server.started:
+        time.sleep(0.02)
+
+    async def on_form(context, params):
+        return types.ElicitResult(action="accept", content={"T1": True, "note": "looks fine"})
+
+    async def go(mode):
+        async with Client(f"http://127.0.0.1:{port}/mcp", elicitation_callback=on_form, mode=mode) as c:
+            async def tool(name, **args):
+                return json.loads((await c.call_tool(name, args)).content[0].text)
+            job = (await tool("new_crate"))["job"]
+            await tool("read_order", lines=TOMATOES, job=job)
+            await tool("inspect", item_id="T1", job=job)
+            asked = await tool("ask_person", kind="pack", question="Pack?", item_id="T1", order_line=1, job=job)
+            placed = await tool("place", item_id="T1", destination="order", order_line=1, reason="approved", job=job)
+            return c.protocol_version, asked, placed
+
+    try:
+        for mode in ("legacy", "auto"):
+            version, asked, placed = anyio.run(go, mode)
+            assert asked["status"] == "approved" and asked["answer"] == "looks fine" and placed["ok"], (mode, version)
+    finally:
+        server.should_exit = True
+        thread.join(5)
