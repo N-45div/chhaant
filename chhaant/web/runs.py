@@ -43,6 +43,7 @@ class Run:
     error: str = ""
     finished_at: float | None = None
     faults: bool = False      # simulated camera faults (chhaant.robot.faults.DEMO_FAULTS)
+    agent: str = ""           # which agent ran it: a key of RunManager.agents
 
 
 def _forecast(f) -> dict | None:
@@ -55,9 +56,11 @@ def thumb_ref(item) -> str:
 
 class RunManager:
     def __init__(self, make_cell, make_backend, runs_dir: str, per_ip_per_hour: int = 6,
-                 daily_cap: int = 150, person_timeout_s: float = 300.0, on_finish: list | None = None, today=None):
+                 daily_cap: int = 150, person_timeout_s: float = 300.0, on_finish: list | None = None, today=None,
+                 agents: dict[str, str] | None = None):
         self.make_cell = make_cell          # (trace, reviewer, seed) -> Cell
-        self.make_backend = make_backend    # () -> language-model backend
+        self.make_backend = make_backend    # (agent) -> language-model backend; () when there is one agent
+        self.agents = dict(agents or {})    # key -> label, the first is the default; only these can be chosen
         self.today = today                  # () -> the cell's local date, so "Saturday" means this Saturday
         self.runs_dir = runs_dir
         self.per_ip_per_hour, self.daily_cap = per_ip_per_hour, daily_cap
@@ -85,9 +88,14 @@ class RunManager:
         hits.append(now)
         self._day_count += 1
 
-    def start(self, order: str, reviewer_mode: str, ip: str, seed: int = 3, faults: bool = False) -> Run:
+    def start(self, order: str, reviewer_mode: str, ip: str, seed: int = 3, faults: bool = False,
+              agent: str | None = None) -> Run:
         if reviewer_mode not in ("person", "simulated"):
             raise ValueError("reviewer must be 'person' or 'simulated'")
+        if self.agents:
+            agent = agent or next(iter(self.agents))
+            if agent not in self.agents:
+                raise ValueError(f"agent must be one of {', '.join(self.agents)}")
         with self._lock:
             if self.active and self.runs[self.active].status == "running":
                 raise Busy(self.active)
@@ -96,14 +104,15 @@ class RunManager:
             trace = Trace(os.path.join(self.runs_dir, run_id, "trace.jsonl"))
             reviewer = PersonReviewer(self.person_timeout_s) if reviewer_mode == "person" else SimulatedReviewer()
             run = Run(run_id, order, reviewer_mode, seed, self.make_cell(trace, reviewer, seed, faults), reviewer,
-                      time.time(), faults=faults)
+                      time.time(), faults=faults, agent=agent or "")
             self.runs[run_id], self.active = run, run_id
         threading.Thread(target=self._go, args=(run,), daemon=True).start()
         return run
 
     def _go(self, run: Run) -> None:
         try:
-            run.result = run_agent(run.order, run.cell, self.make_backend(), today=self.today() if self.today else None)
+            backend = self.make_backend(run.agent) if self.agents else self.make_backend()
+            run.result = run_agent(run.order, run.cell, backend, today=self.today() if self.today else None)
             run.status = "done"
         except Exception as err:  # report the failure in the run instead of losing the thread
             run.status, run.error = "error", f"{type(err).__name__}: {err}"
@@ -112,7 +121,8 @@ class RunManager:
             run.finished_at = time.time()
             with open(os.path.join(self.runs_dir, run.id, "result.json"), "w") as fh:
                 json.dump({"order": run.order, "status": run.status, "error": run.error, "result": run.result,
-                           "reviewer": run.reviewer_mode, "seed": run.seed, "camera_faults": run.faults},
+                           "reviewer": run.reviewer_mode, "seed": run.seed, "camera_faults": run.faults,
+                           "agent": run.agent},
                           fh, indent=1, default=str)
             for hook in self.on_finish:
                 try:
@@ -138,7 +148,8 @@ class RunManager:
         events = cell.trace.events
         return {
             "id": run.id, "status": run.status, "error": run.error, "order_text": run.order,
-            "reviewer": run.reviewer_mode, "elapsed_s": round((run.finished_at or time.time()) - run.started_at, 1),
+            "reviewer": run.reviewer_mode, "agent": self.agents.get(run.agent, run.agent),
+            "elapsed_s": round((run.finished_at or time.time()) - run.started_at, 1),
             "order": [{"line": ln.line, "produce": ln.produce, "quantity": ln.quantity,
                        "eat_in_days": ln.eat_in_days, "packed": list(ln.packed)} for ln in cell.order],
             "items": [self._item_row(cell, i) for i in cell.items],

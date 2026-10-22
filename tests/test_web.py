@@ -150,3 +150,24 @@ def test_finished_runs_reach_the_reporting_hooks(client):
     snap = wait_for(c, rid, lambda s: s["status"] != "running")
     assert snap["status"] == "done" and seen == [rid]
     assert any(e["kind"] == "hook_error" for e in manager.runs[rid].cell.trace.events)
+
+
+def test_a_visitor_picks_the_agent_from_the_list_only(tmp_path):
+    used = []
+
+    def make_backend(agent):
+        used.append(agent)
+        return ScriptedBackend(script(asks=False))
+
+    manager = RunManager(lambda trace, reviewer, seed, faults=False: Cell(crate(seed), FakeInspectors(), trace=trace, reviewer=reviewer),
+                         make_backend, str(tmp_path / "runs"), per_ip_per_hour=5,
+                         agents={"nova-2-lite": "Amazon Nova 2 Lite", "claude-haiku-4-5": "Claude Haiku 4.5"})
+    c = TestClient(create_app(manager, {"tr6": str(tmp_path), "avocado": str(tmp_path)}, crate, "Amazon Bedrock"))
+    assert [a["key"] for a in c.get("/api/health").json()["agents"]] == ["nova-2-lite", "claude-haiku-4-5"]
+    assert c.post("/api/runs", json={"order": "two tomatoes", "reviewer": "simulated", "agent": "gpt-9"}).status_code == 400
+    r = c.post("/api/runs", json={"order": "two tomatoes", "reviewer": "simulated", "agent": "claude-haiku-4-5"}).json()
+    snap = wait_for(c, r["id"], lambda s: s["status"] != "running")
+    assert snap["agent"] == "Claude Haiku 4.5" and used == ["claude-haiku-4-5"]
+    r = c.post("/api/runs", json={"order": "two tomatoes", "reviewer": "simulated"}).json()
+    wait_for(c, r["id"], lambda s: s["status"] != "running")
+    assert used[-1] == "nova-2-lite"  # no choice: the first is the default

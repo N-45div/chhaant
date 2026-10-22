@@ -39,6 +39,7 @@ class StartRun(BaseModel):
     reviewer: str = "person"
     seed: int = Field(default=3, ge=0, le=999)
     faults: bool = False  # spoil some photos (chhaant.robot.faults.DEMO_FAULTS) to show how the cell copes
+    agent: str | None = None  # a key of the manager's agents; None means the default
 
 
 class Answer(BaseModel):
@@ -106,7 +107,8 @@ def create_app(manager: RunManager, photo_roots: dict[str, str], crate_preview, 
 
     @app.get("/api/health")
     def health():
-        return {"ok": True, "active": manager.active, "backend": backend_name, "opencv": opencv}
+        return {"ok": True, "active": manager.active, "backend": backend_name, "opencv": opencv,
+                "agents": [{"key": k, "label": v} for k, v in manager.agents.items()]}
 
     @app.get("/api/crate")
     def crate(seed: int = 3):
@@ -116,7 +118,7 @@ def create_app(manager: RunManager, photo_roots: dict[str, str], crate_preview, 
     @app.post("/api/runs", status_code=202)
     def start(body: StartRun, request: Request):
         try:
-            run = manager.start(body.order, body.reviewer, client_ip(request), body.seed, body.faults)
+            run = manager.start(body.order, body.reviewer, client_ip(request), body.seed, body.faults, body.agent)
         except Busy as busy:
             return JSONResponse({"error": "a run is in progress; watch it", "active": busy.active_id}, status_code=409)
         except RateLimited as limited:

@@ -4,7 +4,7 @@ Settings come from the environment:
     CHHAANT_TR6, CHHAANT_AVOCADO   data folders (default data/tr6, data/avocado)
     CHHAANT_MODEL, CHHAANT_SHELF   quality model and avocado forecaster
     CHHAANT_RUNS                   where run traces are written (default data/runs)
-    CHHAANT_BEDROCK_MODEL, AWS_REGION   the agent's model on Amazon Bedrock (default Claude Haiku 4.5)
+    CHHAANT_AGENT, AWS_REGION      the default agent on Amazon Bedrock: nova-2-lite or claude-haiku-4-5
     CHHAANT_RUNS_PER_HOUR, CHHAANT_DAILY_RUNS, HOST, PORT
     CHHAANT_EVIDENCE_BUCKET        if set, each run's trace goes to S3 and metrics to CloudWatch
     CHHAANT_UTC_OFFSET_H           the cell's time zone, for the date the agent is told (default 5.5, India)
@@ -29,6 +29,10 @@ from chhaant.vision.model import QualityModel
 from chhaant.web.app import create_app
 from chhaant.web.runs import RunManager
 
+AGENTS = {  # key -> (Bedrock model or inference profile, label)
+    "nova-2-lite": ("global.amazon.nova-2-lite-v1:0", "Amazon Nova 2 Lite"),
+    "claude-haiku-4-5": ("global.anthropic.claude-haiku-4-5-20251001-v1:0", "Claude Haiku 4.5"),
+}
 
 
 def build_app():
@@ -63,11 +67,13 @@ def build_app():
         def sim_meshes():
             return scene_meshes(SimTwin([("x", "Tomato")]).cell.model)
 
-    model = env("CHHAANT_BEDROCK_MODEL", "global.anthropic.claude-haiku-4-5-20251001-v1:0")
-    label = f"Amazon Bedrock ({model.split('.')[-1].split('-v1')[0]})"
+    # Both on Amazon Bedrock, both measured on the same 32 orders (eval/results/cell_runs_*_iter6.md).
+    default = env("CHHAANT_AGENT", "nova-2-lite")
+    agents = {k: AGENTS[k] for k in sorted(AGENTS, key=lambda k: k != default)}
+    label = "Amazon Bedrock"
 
-    def make_backend():
-        return BedrockBackend(model, env("AWS_REGION", "ap-south-1"))
+    def make_backend(agent: str):
+        return BedrockBackend(AGENTS[agent][0], env("AWS_REGION", "ap-south-1"))
 
     hooks = []
     if env("CHHAANT_EVIDENCE_BUCKET"):
@@ -78,7 +84,7 @@ def build_app():
     today = lambda: datetime.now(cell_tz).date()  # noqa: E731
     manager = RunManager(make_cell, make_backend, env("CHHAANT_RUNS", "data/runs"),
                          per_ip_per_hour=int(env("CHHAANT_RUNS_PER_HOUR", "6")), daily_cap=int(env("CHHAANT_DAILY_RUNS", "150")),
-                         on_finish=hooks, today=today)
+                         on_finish=hooks, today=today, agents={k: v[1] for k, v in agents.items()})
     mcp = None
     if env("CHHAANT_MCP", "1") != "0":  # bring your own agent: no model is called here, the client brings it
         from chhaant.mcp_server import hosted
