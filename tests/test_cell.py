@@ -220,7 +220,7 @@ def test_verdicts_are_acted_on_alone_only_where_validated():
 
 
 def test_cannot_finish_short_with_an_approved_item_left_in_the_crate():
-    # Nemotron, iteration 2: a person said "fine to pack" and the item was never placed.
+    # Found in iteration 2: a person said "fine to pack" and the item was never placed.
     c = two_avocado_lines()
     c.ask_person("A1", "pack", "Can A1 go into the day-4 line?", order_line=2)
     r = c.finish("Line 2 is short.")

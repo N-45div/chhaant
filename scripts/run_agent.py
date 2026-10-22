@@ -6,8 +6,8 @@ a simulated reviewer answers the agent's questions from the dataset labels and
 is reported as such; --no-reviewer leaves questions pending for a person.
 
 Usage:
-    python scripts/run_agent.py                                  # Bedrock, Claude Haiku 4.5
-    python scripts/run_agent.py --backend nemotron --model nvidia/nemotron-3-super-120b-a12b
+    python scripts/run_agent.py                  # Amazon Bedrock, Claude Haiku 4.5
+    python scripts/run_agent.py --model <id>     # another Bedrock model or inference profile
 """
 
 import argparse
@@ -21,7 +21,7 @@ from chhaant.agent.approval import SimulatedReviewer  # noqa: E402
 from chhaant.agent.cell import Cell  # noqa: E402
 from chhaant.agent.crate import avocado_items, tr6_items  # noqa: E402
 from chhaant.agent.inspectors import CellInspectors  # noqa: E402
-from chhaant.agent.llm import BedrockBackend, OpenAICompatBackend  # noqa: E402
+from chhaant.agent.llm import BedrockBackend  # noqa: E402
 from chhaant.agent.loop import run  # noqa: E402
 from chhaant.agent.trace import Trace  # noqa: E402
 from chhaant.decide.shelf import ShelfLife  # noqa: E402
@@ -29,7 +29,6 @@ from chhaant.vision.model import QualityModel  # noqa: E402
 
 DEFAULT_ORDER = ("Hi! For tonight's guacamole I need 2 avocados that are ripe today, plus 1 avocado to eat "
                  "in three days. Also 2 good tomatoes for a salad, no rush on those.")
-TOKEN_FACTORY = "https://api.tokenfactory.nebius.com/v1"
 
 
 def short(out: dict) -> str:
@@ -46,7 +45,6 @@ def short(out: dict) -> str:
 
 def main() -> None:
     ap = argparse.ArgumentParser()
-    ap.add_argument("--backend", choices=("bedrock", "nemotron"), default="bedrock")
     ap.add_argument("--model", default=None)
     ap.add_argument("--order", default=DEFAULT_ORDER)
     ap.add_argument("--seed", type=int, default=3)
@@ -62,13 +60,7 @@ def main() -> None:
     trace = Trace(os.path.join(run_dir, "trace.jsonl"))
     cell = Cell(items, inspectors, trace=trace, reviewer=None if args.no_reviewer else SimulatedReviewer())
 
-    if args.backend == "bedrock":
-        backend = BedrockBackend(**({"model_id": args.model} if args.model else {}))
-    else:
-        key = os.environ.get("NEBIUS_API_KEY")
-        if not key:
-            sys.exit("set NEBIUS_API_KEY for the Nemotron backend")
-        backend = OpenAICompatBackend(TOKEN_FACTORY, key, args.model or "nvidia/nemotron-3-super-120b-a12b")
+    backend = BedrockBackend(**({"model_id": args.model} if args.model else {}))
 
     print(f"order: {args.order}\ncrate: {[f'{i.item_id}={i.produce}' for i in items]}\n")
     result = run(args.order, cell, backend)

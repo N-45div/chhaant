@@ -57,7 +57,7 @@ NULLISH = {"", "none", "null"}
 
 
 def _nullish(v) -> bool:
-    """Some models send null as the string "None" (Nemotron did, ten times in one run)."""
+    """Some models send null as the string "None" (one did, ten times in one run)."""
     return v is None or (isinstance(v, str) and v.strip().lower() in NULLISH)
 
 

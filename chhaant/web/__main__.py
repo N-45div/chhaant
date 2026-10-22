@@ -4,9 +4,7 @@ Settings come from the environment:
     CHHAANT_TR6, CHHAANT_AVOCADO   data folders (default data/tr6, data/avocado)
     CHHAANT_MODEL, CHHAANT_SHELF   quality model and avocado forecaster
     CHHAANT_RUNS                   where run traces are written (default data/runs)
-    CHHAANT_BACKEND                bedrock (default) or nemotron
-    CHHAANT_BEDROCK_MODEL, AWS_REGION
-    NEBIUS_API_KEY, NEBIUS_MODEL   for the Nemotron backend on Nebius Token Factory
+    CHHAANT_BEDROCK_MODEL, AWS_REGION   the agent's model on Amazon Bedrock (default Claude Haiku 4.5)
     CHHAANT_RUNS_PER_HOUR, CHHAANT_DAILY_RUNS, HOST, PORT
     CHHAANT_EVIDENCE_BUCKET        if set, each run's trace goes to S3 and metrics to CloudWatch
     CHHAANT_UTC_OFFSET_H           the cell's time zone, for the date the agent is told (default 5.5, India)
@@ -24,14 +22,13 @@ import uvicorn
 from chhaant.agent.cell import Cell
 from chhaant.agent.crate import demo_crate
 from chhaant.agent.inspectors import CellInspectors
-from chhaant.agent.llm import BedrockBackend, OpenAICompatBackend
+from chhaant.agent.llm import BedrockBackend
 from chhaant.decide.shelf import ShelfLife
 from chhaant.robot.faults import DEMO_FAULTS
 from chhaant.vision.model import QualityModel
 from chhaant.web.app import create_app
 from chhaant.web.runs import RunManager
 
-TOKEN_FACTORY = "https://api.tokenfactory.nebius.com/v1"
 
 
 def build_app():
@@ -66,19 +63,11 @@ def build_app():
         def sim_meshes():
             return scene_meshes(SimTwin([("x", "Tomato")]).cell.model)
 
-    backend_kind = env("CHHAANT_BACKEND", "bedrock")
-    if backend_kind == "nemotron":
-        model = env("NEBIUS_MODEL", "nvidia/nemotron-3-super-120b-a12b")
-        label = f"Nemotron on Nebius Token Factory ({model})"
+    model = env("CHHAANT_BEDROCK_MODEL", "global.anthropic.claude-haiku-4-5-20251001-v1:0")
+    label = f"Amazon Bedrock ({model.split('.')[-1].split('-v1')[0]})"
 
-        def make_backend():
-            return OpenAICompatBackend(TOKEN_FACTORY, env("NEBIUS_API_KEY", ""), model)
-    else:
-        model = env("CHHAANT_BEDROCK_MODEL", "global.anthropic.claude-haiku-4-5-20251001-v1:0")
-        label = f"Amazon Bedrock ({model.split('.')[-1].split('-v1')[0]})"
-
-        def make_backend():
-            return BedrockBackend(model, env("AWS_REGION", "ap-south-1"))
+    def make_backend():
+        return BedrockBackend(model, env("AWS_REGION", "ap-south-1"))
 
     hooks = []
     if env("CHHAANT_EVIDENCE_BUCKET"):

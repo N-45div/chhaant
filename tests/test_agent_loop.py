@@ -1,8 +1,6 @@
-import json
-
 from chhaant.agent.cell import Cell
 from chhaant.agent.crate import CrateItem
-from chhaant.agent.llm import BedrockBackend, OpenAICompatBackend, Reply, ScriptedBackend, ToolCall
+from chhaant.agent.llm import BedrockBackend, Reply, ScriptedBackend, ToolCall
 from datetime import date
 
 from chhaant.agent.loop import run, system_prompt
@@ -72,7 +70,7 @@ def test_unknown_tool_and_bad_arguments_do_not_crash():
 
 
 def test_null_sent_as_a_string_reads_as_null():
-    # Nemotron sent "order_line": "None" for crate and sell-today moves, ten times in one run.
+    # One model sent "order_line": "None" for crate and sell-today moves, ten times in one run.
     cell = Cell(crate(), FakeInspectors())
     out = call(cell, "read_order", {"lines": [{"produce": "tomato", "quantity": "1", "eat_in_days": "null"}]})
     assert out["ok"] and out["order"][0]["quantity"] == 1 and out["order"][0]["eat_in_days"] is None
@@ -100,27 +98,6 @@ def test_bedrock_messages_and_reply_translation():
     assert reply.tool_calls[0].name == "list_crate" and reply.usage == {"input": 10, "output": 5}
     assert sent["messages"][2]["content"][0]["toolResult"]["status"] == "error"
     assert sent["toolConfig"]["tools"][0]["toolSpec"]["inputSchema"]["json"]["required"] == ["lines"]
-
-
-def test_openai_compatible_translation_for_nemotron():
-    sent = {}
-
-    def post(payload):
-        sent.update(payload)
-        return {"choices": [{"message": {"content": None, "tool_calls": [
-            {"id": "t1", "type": "function", "function": {"name": "inspect", "arguments": json.dumps({"item_id": "T1"})}}]},
-            "finish_reason": "tool_calls"}], "usage": {"prompt_tokens": 7, "completion_tokens": 3}}
-
-    backend = OpenAICompatBackend("https://example.invalid/v1", "key", "nvidia/nemotron", post=post)
-    msgs = [{"role": "user", "content": [{"text": "hi"}]},
-            {"role": "assistant", "content": [{"text": "checking"}, {"tool_use": {"id": "t0", "name": "list_crate", "input": {}}}]},
-            {"role": "user", "content": [{"tool_result": {"id": "t0", "content": {"ok": True}, "error": False}}]}]
-    reply = backend.chat("sys", msgs, TOOLS)
-    assert reply.tool_calls[0].input == {"item_id": "T1"}
-    roles = [m["role"] for m in sent["messages"]]
-    assert roles == ["system", "user", "assistant", "tool"]
-    assert sent["messages"][2]["tool_calls"][0]["function"]["name"] == "list_crate"
-    assert sent["tools"][0]["function"]["parameters"]["required"] == ["lines"]
 
 
 def test_the_model_is_told_the_date_so_named_days_resolve():

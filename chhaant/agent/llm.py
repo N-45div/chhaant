@@ -2,8 +2,6 @@
 
 * ``BedrockBackend``: Amazon Bedrock's Converse API (Claude Haiku 4.5 by
   default, through the global inference profile from ap-south-1).
-* ``OpenAICompatBackend``: any OpenAI-style chat-completions endpoint with
-  tool calls; this is how Nebius Token Factory serves NVIDIA Nemotron.
 * ``ScriptedBackend``: replays fixed replies, for tests.
 
 Messages are kept in one internal form and translated per backend:
@@ -13,9 +11,7 @@ Messages are kept in one internal form and translated per backend:
           | {"tool_result": {"id": str, "content": dict, "error": bool}}
 """
 
-import json
 import time
-import urllib.request
 from dataclasses import dataclass, field
 
 
@@ -85,58 +81,6 @@ class BedrockBackend:
         usage = resp.get("usage", {})
         return Reply("\n".join(text), calls, resp.get("stopReason", ""),
                      {"input": usage.get("inputTokens", 0), "output": usage.get("outputTokens", 0)},
-                     time.perf_counter() - t0)
-
-
-class OpenAICompatBackend:
-    name = "openai-compatible"
-
-    def __init__(self, base_url: str, api_key: str, model: str, max_tokens: int = 1024, post=None):
-        self.url = base_url.rstrip("/") + "/chat/completions"
-        self.api_key, self.model, self.max_tokens = api_key, model, max_tokens
-        self.post = post or self._post
-
-    def _post(self, payload: dict) -> dict:
-        req = urllib.request.Request(self.url, data=json.dumps(payload).encode(), method="POST",
-                                     headers={"Content-Type": "application/json", "Authorization": f"Bearer {self.api_key}"})
-        with urllib.request.urlopen(req, timeout=120) as resp:
-            return json.loads(resp.read())
-
-    @staticmethod
-    def to_chat(system: str, messages: list[dict]) -> list[dict]:
-        out = [{"role": "system", "content": system}]
-        for m in messages:
-            texts = [b["text"] for b in m["content"] if "text" in b]
-            uses = [b["tool_use"] for b in m["content"] if "tool_use" in b]
-            results = [b["tool_result"] for b in m["content"] if "tool_result" in b]
-            if m["role"] == "assistant":
-                msg = {"role": "assistant", "content": "\n".join(texts) or None}
-                if uses:
-                    msg["tool_calls"] = [{"id": u["id"], "type": "function",
-                                          "function": {"name": u["name"], "arguments": json.dumps(u["input"])}} for u in uses]
-                out.append(msg)
-            else:
-                out += [{"role": "tool", "tool_call_id": r["id"], "content": json.dumps(r["content"])} for r in results]
-                if texts:
-                    out.append({"role": "user", "content": "\n".join(texts)})
-        return out
-
-    def chat(self, system: str, messages: list[dict], tools: list[dict]) -> Reply:
-        t0 = time.perf_counter()
-        resp = self.post({
-            "model": self.model, "messages": self.to_chat(system, messages), "max_tokens": self.max_tokens,
-            "temperature": 0.0, "tool_choice": "auto",
-            "tools": [{"type": "function", "function": {"name": t["name"], "description": t["description"],
-                                                        "parameters": t["schema"]}} for t in tools]})
-        choice = resp["choices"][0]
-        msg = choice["message"]
-        calls = []
-        for c in msg.get("tool_calls") or []:
-            args = c["function"].get("arguments") or "{}"
-            calls.append(ToolCall(c["id"], c["function"]["name"], json.loads(args) if isinstance(args, str) else args))
-        usage = resp.get("usage", {})
-        return Reply(msg.get("content") or "", calls, choice.get("finish_reason", ""),
-                     {"input": usage.get("prompt_tokens", 0), "output": usage.get("completion_tokens", 0)},
                      time.perf_counter() - t0)
 
 
