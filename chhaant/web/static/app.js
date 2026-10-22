@@ -63,7 +63,7 @@ async function fillViews(itemId, box) {
 }
 
 function renderEvent(e) {
-  if (e.kind === "start") return li("model", `<b>Order:</b> ${esc(e.order)}`);
+  if (e.kind === "start") return li("model", `<b>Order:</b> ${esc(e.order)}${e.model ? `<div class="small muted">agent: ${esc(e.model)}</div>` : ""}`);
   if (e.kind === "model" && e.text) return li("model", esc(e.text));
   if (e.kind === "tool_result") {
     const call = pendingCalls.shift() || {};
@@ -162,7 +162,8 @@ function watch(id) {
 async function start() {
   $("#run").disabled = true;
   const reviewer = document.querySelector("input[name=reviewer]:checked").value;
-  const { ok, status, body } = await api("/api/runs", { method: "POST", body: JSON.stringify({ order: $("#order").value, reviewer, seed: 3, faults: $("#faults").checked }) });
+  const agent = $("#agent").value || null;
+  const { ok, status, body } = await api("/api/runs", { method: "POST", body: JSON.stringify({ order: $("#order").value, reviewer, seed: 3, faults: $("#faults").checked, agent }) });
   if (ok) return watch(body.id);
   $("#run").disabled = false;
   $("#run-note").textContent = body.error || `could not start (${status})`;
@@ -196,6 +197,7 @@ $("#run").addEventListener("click", start);
   $("#mcp-cmd").textContent = `claude mcp add --transport http chhaant ${location.origin}/mcp`;
   const health = await api("/api/health");
   $("#backend").textContent = health.ok ? health.body.backend || "ready" : "offline";
+  $("#agent").innerHTML = (health.body.agents || []).map((a) => `<option value="${esc(a.key)}">${esc(a.label)}</option>`).join("");
   loadCrate();
   const active = await api("/api/runs/active");
   if (active.body.id) return watch(active.body.id);
