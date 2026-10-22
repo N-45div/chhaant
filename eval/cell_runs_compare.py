@@ -1,6 +1,6 @@
-"""One table across the end-to-end iterations (eval/cell_runs.py results), per language model.
+"""One table across the end-to-end iterations (eval/cell_runs.py results).
 
-    python eval/cell_runs_compare.py baseline iter1 iter2 iter3   # writes eval/results/cell_runs_iterations.md
+    python eval/cell_runs_compare.py baseline iter1 iter2 iter3 iter4 iter5   # writes eval/results/cell_runs_iterations.md
 """
 
 import json
@@ -21,6 +21,7 @@ CHANGES = {
     "iter2": "a discard needs a spoiled item; ask before placing an 'ask' item; a declined item goes back to the crate",
     "iter3": "no finishing short with an approved item still in the crate; each 'ask' line is asked about",
     "iter4": "a person reviews several items in one glance (ask_person item_ids); the agent batches per line",
+    "iter5": "sell-today needs its own question; a yes to a general question permits no move",
 }
 
 
