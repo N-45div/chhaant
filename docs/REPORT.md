@@ -14,9 +14,9 @@ Live: <https://d1lk9oj2so3zh7.cloudfront.net> (AWS, Graviton4 with the Cloud-Opt
 
 | What | Result | Where |
 |---|---|---|
-| End to end: wrong items packed for a customer, 32 orders x 2 language models | 22 and 21 at the start, **0 and 0** after the measured iterations | §7.1 |
-| End to end: share of what the crate could have filled, packed correctly | 81% / 78% at the start, **96% / 96%** now | §7.1 |
-| Times a person is interrupted per order (the price of the safety) | 1.7 (Claude Haiku 4.5), 2.0 (Nemotron 3 Super) | §7.1 |
+| End to end: wrong items packed for a customer, 32 orders | 22 at the start, **0** after five measured iterations | §7.1 |
+| End to end: share of what the crate could have filled, packed correctly | 81% at the start, **96%** now | §7.1 |
+| Times a person is interrupted per order (the price of the safety) | 1.7 | §7.1 |
 | The same 32 orders, driven over MCP by an agent I did not write (Claude Code, Claude Sonnet 4.5) | **0 wrong** in 65 packed, fill 94%; its runs exposed two gaps in my rules, both now fixed | §7.1 |
 | Rotate until sure vs looking at all 16 angles, 312 held-out sessions | **38 wrong calls vs 69**, with 3.95 views instead of 16 | §5.1 |
 | Avocado shelf life from two photos + temperature, 426 held-out fruit | mean error **1.05 days** (temperature alone: 3.45) | §5.2 |
@@ -69,8 +69,8 @@ The cell (top half of the diagram) runs once per order:
 ![Agent workflow: one order](agent_workflow.svg)
 
 The tools the model sees are `read_order`, `list_crate`, `inspect`, `look_closer`, `ask_person`, `place` and
-`finish` (`chhaant/agent/tools.py`). Two models are supported through the same tools: Claude Haiku 4.5 on Amazon
-Bedrock (the deployment) and NVIDIA Nemotron 3 Super on Nebius Token Factory.
+`finish` (`chhaant/agent/tools.py`). The agent is Claude Haiku 4.5 on Amazon Bedrock, through the Converse API, so
+any Bedrock model with tool use can take its place (the MCP evaluation in §7.1 drives the cell with Claude Sonnet 4.5).
 
 **Bring your own agent (MCP).** The same tools are also an MCP server (`chhaant/mcp_server.py`, `python -m
 chhaant.mcp_server`), so an agent in any MCP client can run the cell. The rules live in the cell, so that agent is
@@ -267,27 +267,21 @@ again.
 \* Iteration 5 ran while the MCP evaluation below was also using Bedrock; the time is mostly throttling back-off, and 2
 runs throttled out and were run again.
 
-| Nemotron 3 Super (Nebius) | baseline | iter 1 | iter 2 | iter 3 | iter 4 |
-|---|---|---|---|---|---|
-| packed wrong | 21 | 0 | 0 | 0 | 0 |
-| fill | 78% | 96% | 88% | 97% | 96% |
-| times a person is interrupted per order | 1.0 | 3.3 | 2.7 | 2.8 | 2.0 |
-| orders read right | 32/32 | 32/32 | 32/32 | 32/32 | 32/32 |
-
 What each iteration changed, and the failure that drove it:
 
-* **Baseline.** 14 of 21 wrong packs were spoiled tomatoes and mangoes inspected as clean (the model scores 0.00 on all
-  16 views of every spoiled tomato); 7 were avocados packed for tonight while 5–7 days from ripe. The agent never broke
-  a rule; the cell's own decisions were wrong.
+* **Baseline.** 13 of the 22 wrong packs were spoiled tomatoes and mangoes inspected as clean (the model scores 0.00
+  on all 16 views of every spoiled tomato); 7 were avocados whose forecast said ripe in time when they were 5–7 days
+  from ripe; 2 came from the model counting "Monday" as 3 days from a Thursday. The agent never broke a rule: 20 of the
+  22 were the cell's own decisions.
 * **Iteration 1.** Validated-verdict gating (§6); the whole-interval avocado rule (§5.3); questions and approvals bound
   to one order line (before, "OK for Saturday?" was judged as if for tonight, and an approval unlocked any line); the
   cell counts days to a named day (Haiku read "Monday" as 3 days from a Thursday in all four crates); finish refuses a
   summary that calls a short order complete.
 * **Iteration 2.** Haiku discarded avocados a person had declined for one line; declined items now go back to the
   crate, and a discard needs a spoiled item.
-* **Iteration 3.** Nemotron finished with person-approved items still in the crate; finish now refuses that. Bedrock
-  throttling had killed 9 of 32 runs; calls now back off adaptively (0 errors since).
-* **Iteration 4.** Batch review: interruptions 2.9 → 1.8 and 2.8 → 2.0 with no loss.
+* **Iteration 3.** A model I tried during development finished with person-approved items still in the crate; finish
+  now refuses that. Bedrock throttling had killed 9 of 32 runs; calls now back off adaptively.
+* **Iteration 4.** Batch review: interruptions 2.9 → 1.8 with no loss.
 * **Iteration 5.** A gap found by the outside agent below: marking an item down for sale today now needs its own
   question, and a yes to a general question permits no move. For Haiku nothing that counts changed (0 wrong, fill 96%,
   no sound item marked down early).
@@ -298,24 +292,22 @@ tomato, glare at every angle on another, one avocado side cut off by the frame):
 | iteration 4, faults on | packed wrong | fill | unusable photos caught | interruptions per order |
 |---|---|---|---|---|
 | Claude Haiku 4.5 | 0 | 93% (96% without faults) | 77 | 1.9 (1.8) |
-| Nemotron 3 Super | 0 | 93% (96%) | 74 | 2.3 (2.0) |
 
 No unusable photo was ever scored, and the glared tomato went to a person and was still packed when sound. The few
 items lost were avocados the agent allocated differently between lines (A2's forecast now comes from one side),
 within the run-to-run variation noted in §11.
 
-**Repeated, and with an imperfect person.** Iteration 4 rerun three times on every crate and order (96 orders per
-model), and once more with a simulated person who gives the wrong answer 10% or 20% of the time:
+**Repeated, and with an imperfect person.** Iteration 4 rerun three times on every crate and order (96 orders), and
+iteration 5 once more with a simulated person who gives the wrong answer 10% or 20% of the time:
 
 | | orders | items packed | packed wrong | 95% upper bound on the wrong rate | fill | interruptions per order |
 |---|---|---|---|---|---|---|
 | Claude Haiku 4.5, 3 repeats | 96 (3 ended by Bedrock "service unavailable" after 10 retries) | 186 | 0 | 1.6% | 94% | 1.9 |
-| Nemotron 3 Super, 3 repeats | 96 | 194 | 0 | 1.5% | 94% | 2.1 |
-| Nemotron, person wrong 10% of the time | 32 | 65 | 9 (14%) | – | 81% | 2.2 |
-| Nemotron, person wrong 20% of the time | 32 | 67 | 11 (16%) | – | 81% | 2.3 |
+| Claude Haiku 4.5, person wrong 10% of the time | 32 | 71 | 8 (11%) | – | 91% | 1.8 |
+| Claude Haiku 4.5, person wrong 20% of the time | 32 (1 throttled out and was run again) | 70 | 10 (14%) | – | 87% | 1.8 |
 
-The zero rests on the person: almost every mistaken "yes" became a wrong pack, because for tomatoes the camera has no
-signal that could contradict it. The cell still does better than acting on its own verdicts (28% wrong in the
+The zero rests on the person. Where the cell asks, it acts on the answer, and for tomatoes the camera has no signal
+that could contradict a mistaken "yes". The cell still does better than acting on its own verdicts (28% wrong in the
 baseline), but the honest claim is that it puts the decisions it cannot make in front of a person, with the evidence;
 it does not make the person unnecessary.
 
@@ -459,9 +451,9 @@ wrong kind of question is the agent's mistake, and the cell's rule caught it.)
 * **One fruit per type in TR-6.** Its per-produce numbers rest on one fruit followed for days; the avocado numbers rest
   on 426 fruit. Tomato defect detection is at chance on TR-6, so the cell treats it as unvalidated.
 * **The person must answer correctly.** "0 wrong packs" uses a reviewer that answers from the labels; with one wrong
-  10–20% of the time, 14–16% of packed items were wrong (§7.1). A person at the cell should turn the item over: the
+  10–20% of the time, 11–14% of packed items were wrong (§7.1). A person at the cell should turn the item over: the
   camera never sees the underside either.
-* **Small end-to-end set.** 4 crates x 8 orders per model (96 orders with repeats); differences of a few percent
+* **Small end-to-end set.** 4 crates x 8 orders (96 orders with repeats); differences of a few percent
   between iterations are within run-to-run variation.
 * **Questions over MCP are text.** An MCP form holds text and simple fields, so a person answering in an MCP client
   gets the evidence as text with links to the photos (file paths on a local server), not the photos inline as the web

@@ -36,11 +36,11 @@ From [docs/REPORT.md](docs/REPORT.md); every number is a file in `eval/results/`
 
 | What | Result |
 |---|---|
-| Wrong items packed for a customer, 32 orders x 2 language models | 22 and 21 at the start, **0 and 0** after the measured iterations |
-| Share of what the crate could fill, packed correctly | 81% / 78% at the start, **96% / 96%** now |
+| Wrong items packed for a customer, 32 orders | 22 at the start, **0** after five measured iterations |
+| Share of what the crate could fill, packed correctly | 81% at the start, **96%** now |
 | The same 32 orders driven over MCP by an agent I did not write (Claude Code) | **0 wrong** in 65 packed, fill 94% |
-| Times a person is interrupted per order | 1.7 (Claude Haiku 4.5), 2.0 (Nemotron 3 Super) |
-| With a person who answers wrong 10–20% of the time | 14–16% of packs wrong: the zero rests on the person |
+| Times a person is interrupted per order | 1.7 |
+| With a person who answers wrong 10–20% of the time | 11–14% of packs wrong: the zero rests on the person |
 | Rotate until sure vs all 16 angles, 312 held-out sessions | **38 wrong calls vs 69**, with 3.95 views instead of 16 |
 | Avocado shelf life from two photos and the temperature, 426 held-out fruit | mean error **1.05 days** |
 | COOL vs the PyPI wheel on the same Graviton4; Graviton4 vs x86 | same speed and readings; Graviton4 30–41% cheaper per item |
@@ -125,9 +125,8 @@ requirements: 227 tests pass after `fetch_so101.py` and `fetch_model.py`; the 1 
 python -m chhaant.web              # then open http://127.0.0.1:8000
 ```
 
-The agent runs on Amazon Bedrock by default (AWS credentials with access to Claude Haiku 4.5). Set
-`CHHAANT_BACKEND=nemotron` and `NEBIUS_API_KEY` to run it on NVIDIA Nemotron 3 Super through Nebius Token Factory.
-Choose "You, here on this page" to answer the cell's questions yourself; the agent waits for your answer. Other
+The agent runs on Amazon Bedrock (AWS credentials with access to Claude Haiku 4.5; `CHHAANT_BEDROCK_MODEL` picks
+another Bedrock model with tool use). Choose "You, here on this page" to answer the cell's questions yourself; the agent waits for your answer. Other
 settings (data folders, rate limits, the S3 bucket, the time zone) are listed in `chhaant/web/__main__.py`.
 
 ## Bring your own agent (MCP)
@@ -156,8 +155,8 @@ hidden labels is written to the server's disk and never returned to the agent.
 ## Reproducing the evaluation
 
 ```bash
-python eval/cell_runs.py --backend bedrock --out eval/results/cell_runs_bedrock   # 32 orders end to end (Bedrock)
-python eval/cell_runs.py --backend nemotron --out eval/results/cell_runs_nemotron # the same on Nemotron (NEBIUS_API_KEY)
+python eval/cell_runs.py --out eval/results/cell_runs_bedrock                     # 32 orders end to end on Bedrock
+python eval/cell_runs.py --reviewer-error 0.1 --out eval/results/cell_runs_bedrock_reviewer10   # a person wrong 10% of the time
 python eval/mcp_runs.py                                                           # the same orders, Claude Code over MCP
 python eval/score_views.py && python eval/rotate_until_sure.py                    # rotate until sure vs all 16 angles
 python eval/forecast_avocado.py --data data/avocado --model models/chhaant_quality_v1.onnx
