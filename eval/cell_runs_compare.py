@@ -1,6 +1,6 @@
 """One table across the end-to-end iterations (eval/cell_runs.py results).
 
-    python eval/cell_runs_compare.py baseline iter1 iter2 iter3 iter4 iter5   # writes eval/results/cell_runs_iterations.md
+    python eval/cell_runs_compare.py baseline iter1 iter2 iter3 iter4 iter5 iter6   # writes eval/results/cell_runs_iterations.md
 """
 
 import json
@@ -22,6 +22,7 @@ CHANGES = {
     "iter3": "no finishing short with an approved item still in the crate; each 'ask' line is asked about",
     "iter4": "a person reviews several items in one glance (ask_person item_ids); the agent batches per line",
     "iter5": "sell-today needs its own question; a yes to a general question permits no move",
+    "iter6": "timing said in words goes to the cell as words (today, tonight, tomorrow, a weekday)",
 }
 
 
@@ -32,7 +33,8 @@ def main() -> None:
            "The simulated reviewer answers from the labels, so \"packed wrong\" assumes a person answers correctly.", ""]
     for name in names:
         out.append(f"* **{name}**: {CHANGES.get(name, '')}")
-    for backend, label in (("bedrock", "Claude Haiku 4.5 on Amazon Bedrock"),):
+    for backend, label in (("bedrock", "Claude Haiku 4.5 on Amazon Bedrock"), ("nova-2-lite", "Amazon Nova 2 Lite on Amazon Bedrock"),
+                           ("nova-pro", "Amazon Nova Pro on Amazon Bedrock")):
         runs = {}
         for name in names:
             path = f"eval/results/cell_runs_{backend}_{name}.json"
