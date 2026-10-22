@@ -18,7 +18,6 @@ not against what the model understood:
 * honest summary: no "complete" while a line is short
 
     python eval/cell_runs.py --backend bedrock --out eval/results/cell_runs_bedrock
-    python eval/cell_runs.py --backend nemotron --out eval/results/cell_runs_nemotron   # needs NEBIUS_API_KEY
 """
 
 import argparse
@@ -38,8 +37,7 @@ from chhaant.agent.crate import avocado_items, tr6_items  # noqa: E402
 from chhaant.agent.trace import Trace  # noqa: E402
 
 TODAY = date(2026, 10, 15)  # a Thursday
-TOKEN_FACTORY = "https://api.tokenfactory.nebius.com/v1"
-PRICE_PER_M = {"bedrock": (1.0, 5.0), "nemotron": (0.0, 0.0)}  # Haiku 4.5 on Bedrock, $/M tokens in and out
+PRICE_PER_M = {"bedrock": (1.0, 5.0)}  # Haiku 4.5 on Bedrock, $/M tokens in and out
 
 CRATES = [  # TR-6 picks (produce, spoiled) and the avocados' true days left
     {"seed": 3, "tr6": [("Tomato", 0), ("Tomato", 1), ("Tomato", 0), ("Mango", 1)], "avocado": [6, 2, 1, 0]},
@@ -137,7 +135,7 @@ def _init(backend_kind: str, model: str | None, faults: bool = False):
     import cv2
     cv2.setNumThreads(1)
     from chhaant.agent.inspectors import CellInspectors
-    from chhaant.agent.llm import BedrockBackend, OpenAICompatBackend
+    from chhaant.agent.llm import BedrockBackend
     from chhaant.decide.shelf import ShelfLife
     from chhaant.vision.model import QualityModel
     _W["inspectors"] = CellInspectors(QualityModel("models/chhaant_quality_v1.onnx"), "data/tr6", "data/avocado",
@@ -145,11 +143,7 @@ def _init(backend_kind: str, model: str | None, faults: bool = False):
     if faults:  # the live demo's camera faults: a blurred side view, glare at every angle, a side cut off
         from chhaant.robot.faults import DEMO_FAULTS
         _W["inspectors"] = _W["inspectors"].with_faults(DEMO_FAULTS)
-    if backend_kind == "bedrock":
-        _W["backend"] = lambda: BedrockBackend(**({"model_id": model} if model else {}))
-    else:
-        _W["backend"] = lambda: OpenAICompatBackend(TOKEN_FACTORY, os.environ["NEBIUS_API_KEY"],
-                                                    model or "nvidia/nemotron-3-super-120b-a12b")
+    _W["backend"] = lambda: BedrockBackend(**({"model_id": model} if model else {}))
 
 
 def one_run(job: dict) -> dict:
@@ -225,7 +219,7 @@ def summarise(rows: list[dict], backend: str) -> tuple[str, dict]:
 
 def main() -> None:
     ap = argparse.ArgumentParser(description=__doc__.splitlines()[0])
-    ap.add_argument("--backend", choices=("bedrock", "nemotron"), default="bedrock")
+    ap.add_argument("--backend", choices=("bedrock",), default="bedrock")
     ap.add_argument("--model", default=None)
     ap.add_argument("--workers", type=int, default=4)
     ap.add_argument("--crates", default="all", help="e.g. 0,1")

@@ -31,7 +31,7 @@ def main() -> None:
            "The simulated reviewer answers from the labels, so \"packed wrong\" assumes a person answers correctly.", ""]
     for name in names:
         out.append(f"* **{name}**: {CHANGES.get(name, '')}")
-    for backend, label in (("bedrock", "Claude Haiku 4.5 on Amazon Bedrock"), ("nemotron", "Nemotron 3 Super on Nebius Token Factory")):
+    for backend, label in (("bedrock", "Claude Haiku 4.5 on Amazon Bedrock"),):
         runs = {}
         for name in names:
             path = f"eval/results/cell_runs_{backend}_{name}.json"
