@@ -185,9 +185,11 @@ def test_the_cell_counts_days_to_a_named_day():
     from chhaant.agent.cell import days_until
     thursday = date(2026, 10, 15)
     got = {d: days_until(d, thursday) for d in ("Saturday", "monday", "next Wednesday", "Thursday", "next Thursday",
-                                                "Sat", "tomorrow", "tonight", "someday")}
+                                                "Sat", "tomorrow", "tonight", "today", "for today", "for next Thursday",
+                                                "someday")}
     assert got == {"Saturday": 2, "monday": 4, "next Wednesday": 6, "Thursday": 0.5, "next Thursday": 7, "Sat": 2,
-                   "tomorrow": 1, "tonight": 0.5, "someday": None}  # a live run on a Saturday read "Saturday" as 7
+                   "tomorrow": 1, "tonight": 0.5, "today": 0.5, "for today": 0.5, "for next Thursday": 7,
+                   "someday": None}  # a live run on a Saturday read "Saturday" as 7; Nova read "for today" as 1
 
 
 def test_read_order_turns_a_named_day_into_days(cell):

@@ -51,8 +51,9 @@ Job = Annotated[str | None, Field(description="the job id new_crate returned (ne
 class OrderLineIn(BaseModel):
     produce: str
     quantity: int = Field(ge=1)
-    eat_in_days: float | None = Field(None, description="0.5 = tonight, 1 = tomorrow; null when no timing was given")
-    eat_on: str | None = Field(None, description="a named day ('Saturday', 'next Wednesday'); the cell counts the days")
+    eat_in_days: float | None = Field(None, description="a number of days ('in three days' = 3); null otherwise")
+    eat_on: str | None = Field(None, description="timing in the customer's words ('today', 'tonight', 'tomorrow', "
+                                                 "'Saturday'); the cell counts the days")
 
 
 class ClientReviewer:

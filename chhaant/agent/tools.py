@@ -3,10 +3,10 @@
 TOOLS = [
     {"name": "read_order",
      "description": ("Record your reading of the customer's order as lines. Call this first. "
-                     "eat_in_days is when the item will be eaten (0.5 = tonight, 1 = tomorrow, 3 = in three days); "
-                     "use null when the customer gave no timing, and never assume one. When the customer names a "
-                     "day ('Saturday', 'next Wednesday'), put that in eat_on and leave eat_in_days null: the cell "
-                     "counts the days."),
+                     "When the customer says when in words ('today', 'tonight', 'tomorrow', 'Saturday', 'next "
+                     "Wednesday'), put those words in eat_on and leave eat_in_days null: the cell counts the days. "
+                     "Use eat_in_days only for a number of days ('in three days' = 3). Leave both null when the "
+                     "customer gave no timing for that item, and never assume one."),
      "schema": {"type": "object", "properties": {"lines": {"type": "array", "items": {
          "type": "object",
          "properties": {"produce": {"type": "string"}, "quantity": {"type": "integer", "minimum": 1},

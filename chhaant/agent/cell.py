@@ -36,6 +36,7 @@ def days_until(day: str, today: date) -> float | None:
     weekday to a week out (a live run read "Saturday" on a Saturday as 7 days).
     """
     key = re.sub(r"[^a-z ]", "", str(day).lower()).strip()
+    key = re.sub(r"^(for|by)\s+", "", key)  # "for today", "by Saturday": the customer's own words
     is_next = key.startswith("next ")
     key = re.sub(r"^(this|next|on|coming|the)\s+", "", key).strip()
     if key in ("tonight", "today", "this evening"):
