@@ -67,6 +67,8 @@ Resources:
                 Resource:
                   - !Sub arn:aws:bedrock:${AWS::Region}:${AWS::AccountId}:inference-profile/${BedrockModel}
                   - arn:aws:bedrock:*::foundation-model/anthropic.claude-haiku-4-5-20251001-v1:0
+                  - !Sub arn:aws:bedrock:${AWS::Region}:${AWS::AccountId}:inference-profile/global.amazon.nova-2-lite-v1:0
+                  - arn:aws:bedrock:*::foundation-model/amazon.nova-2-lite-v1:0
               - Sid: Metrics
                 Effect: Allow
                 Action: cloudwatch:PutMetricData
