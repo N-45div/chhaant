@@ -37,7 +37,13 @@ from chhaant.agent.crate import avocado_items, tr6_items  # noqa: E402
 from chhaant.agent.trace import Trace  # noqa: E402
 
 TODAY = date(2026, 10, 15)  # a Thursday
-PRICE_PER_M = {"bedrock": (1.0, 5.0)}  # Haiku 4.5 on Bedrock, $/M tokens in and out
+DEFAULT_MODEL = "global.anthropic.claude-haiku-4-5-20251001-v1:0"
+# $ per million tokens in and out, from Mumbai (ap-south-1). Nova: the AWS Price List API, Oct 22 2026.
+PRICE_PER_M = {"claude-haiku-4-5": (1.0, 5.0), "nova-2-lite": (0.35, 2.95), "nova-pro": (0.94, 3.76)}
+
+
+def price(model: str) -> tuple[float, float]:
+    return next((v for k, v in PRICE_PER_M.items() if k in model), (0.0, 0.0))
 
 CRATES = [  # TR-6 picks (produce, spoiled) and the avocados' true days left
     {"seed": 3, "tr6": [("Tomato", 0), ("Tomato", 1), ("Tomato", 0), ("Mango", 1)], "avocado": [6, 2, 1, 0]},
@@ -187,9 +193,9 @@ def upper_95(k: int, n: int) -> float:
     return hi
 
 
-def summarise(rows: list[dict], backend: str) -> tuple[str, dict]:
+def summarise(rows: list[dict], model: str) -> tuple[str, dict]:
     ok = [r for r in rows if not r["error"]]
-    pin, pout = PRICE_PER_M[backend]
+    pin, pout = price(model)
     tot = lambda k: sum(r[k] for r in ok)  # noqa: E731
     best = tot("best_possible")
     agg = {"runs": len(rows), "errors": len(rows) - len(ok), "packed_right": tot("packed_right"),
@@ -206,7 +212,7 @@ def summarise(rows: list[dict], backend: str) -> tuple[str, dict]:
            "median_seconds": statistics.median(r["seconds"] for r in ok) if ok else None,
            "turns_per_run": round(tot("turns") / max(1, len(ok)), 1),
            "cost_per_run_usd": round((tot("tokens_in") * pin + tot("tokens_out") * pout) / 1e6 / max(1, len(ok)), 4)}
-    lines = [f"# The cell end to end ({backend})", "",
+    lines = [f"# The cell end to end ({model} on Amazon Bedrock)", "",
              f"{len(CRATES)} real crates x {len(ORDERS)} orders, simulated reviewer, today = {TODAY:%A %d %B %Y}.", "",
              "| measure | value |", "|---|---|"] + [f"| {k} | {v} |" for k, v in agg.items()]
     lines += ["", "| crate | order | right | wrong | best | questions | refused | read right | dishonest | s | error |",
@@ -246,7 +252,7 @@ def main() -> None:
             for r, c, o in triples]
     with get_context("spawn").Pool(args.workers, initializer=_init, initargs=(args.backend, args.model, args.faults)) as pool:
         rows = kept + pool.map(one_run, jobs, chunksize=1)
-    text, agg = summarise(rows, args.backend)
+    text, agg = summarise(rows, args.model or DEFAULT_MODEL)
     with open(out + ".md", "w", encoding="utf-8") as fh:
         fh.write(text)
     with open(out + ".json", "w") as fh:
