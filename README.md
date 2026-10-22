@@ -36,10 +36,11 @@ From [docs/REPORT.md](docs/REPORT.md); every number is a file in `eval/results/`
 
 | What | Result |
 |---|---|
-| Wrong items packed for a customer, 32 orders | 22 at the start, **0** after five measured iterations |
-| Share of what the crate could fill, packed correctly | 81% at the start, **96%** now |
+| Wrong items packed for a customer, 32 orders | 22 at the start, **0** after six measured iterations, with Claude Haiku 4.5 and with Amazon Nova 2 Lite |
+| Share of what the crate could fill, packed correctly | 81% at the start, **94%** now with either model |
 | The same 32 orders driven over MCP by an agent I did not write (Claude Code) | **0 wrong** in 65 packed, fill 94% |
-| Times a person is interrupted per order | 1.7 |
+| Times a person is interrupted per order | 1.9 (Claude Haiku 4.5), 2.6 (Amazon Nova 2 Lite) |
+| Time and cost per order | 12 s and $0.024 (Amazon Nova 2 Lite), 39 s and $0.044 (Claude Haiku 4.5) |
 | With a person who answers wrong 10–20% of the time | 11–14% of packs wrong: the zero rests on the person |
 | Rotate until sure vs all 16 angles, 312 held-out sessions | **38 wrong calls vs 69**, with 3.95 views instead of 16 |
 | Avocado shelf life from two photos and the temperature, 426 held-out fruit | mean error **1.05 days** |
@@ -125,8 +126,8 @@ requirements: 227 tests pass after `fetch_so101.py` and `fetch_model.py`; the 1 
 python -m chhaant.web              # then open http://127.0.0.1:8000
 ```
 
-The agent runs on Amazon Bedrock (AWS credentials with access to Claude Haiku 4.5; `CHHAANT_BEDROCK_MODEL` picks
-another Bedrock model with tool use). Choose "You, here on this page" to answer the cell's questions yourself; the agent waits for your answer. Other
+The agent runs on Amazon Bedrock: Amazon Nova 2 Lite by default, or Claude Haiku 4.5, chosen on the page per run
+(AWS credentials with Bedrock access to both; `CHHAANT_AGENT` sets the default). Choose "You, here on this page" to answer the cell's questions yourself; the agent waits for your answer. Other
 settings (data folders, rate limits, the S3 bucket, the time zone) are listed in `chhaant/web/__main__.py`.
 
 ## Bring your own agent (MCP)
@@ -155,7 +156,8 @@ hidden labels is written to the server's disk and never returned to the agent.
 ## Reproducing the evaluation
 
 ```bash
-python eval/cell_runs.py --out eval/results/cell_runs_bedrock                     # 32 orders end to end on Bedrock
+python eval/cell_runs.py --out eval/results/cell_runs_bedrock                     # 32 orders end to end, Claude Haiku 4.5
+python eval/cell_runs.py --model global.amazon.nova-2-lite-v1:0 --out eval/results/cell_runs_nova-2-lite  # the same on Nova 2 Lite
 python eval/cell_runs.py --reviewer-error 0.1 --out eval/results/cell_runs_bedrock_reviewer10   # a person wrong 10% of the time
 python eval/mcp_runs.py                                                           # the same orders, Claude Code over MCP
 python eval/score_views.py && python eval/rotate_until_sure.py                    # rotate until sure vs all 16 angles

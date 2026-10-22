@@ -91,8 +91,8 @@ One photo at a time, at a 512-pixel working size so a recorded photo and a 12 MP
 * `approval.py`: questions and answers. One review can hold several items (a batch). `PersonReviewer` waits for a real
   person on the page. `SimulatedReviewer` answers from the dataset labels, for evaluation, and is always labelled
   simulated.
-* `loop.py` and `llm.py`: the agent loop and its model backend, Claude Haiku 4.5 on Amazon Bedrock through the
-  Converse API (any Bedrock model with tool use fits). `tools.py` holds the tool schemas and a dispatcher that turns bad arguments into errors the
+* `loop.py` and `llm.py`: the agent loop and its model backend on Amazon Bedrock's Converse API. The live site offers
+  Amazon Nova 2 Lite (the default) and Claude Haiku 4.5; any Bedrock model with tool use fits. `tools.py` holds the tool schemas and a dispatcher that turns bad arguments into errors the
   model can read.
 * `crate.py`: crates of real produce, each item carrying hidden labels that only the scorer reads.
 
@@ -149,8 +149,8 @@ Each script writes its results to `eval/results/`, and the report quotes those f
 ## Why it is built this way
 
 * **Rules in code, not in the prompt.** The model plans; the cell decides what is allowed. With the rules and the
-  validation gate in code, the built-in agent (Claude Haiku 4.5) and one I did not write (Claude Code with Claude
-  Sonnet 4.5, over MCP) packed no wrong item across the evaluation.
+  validation gate in code, three agents packed no wrong item across the final evaluation: Amazon Nova 2 Lite, Claude
+  Haiku 4.5, and one I did not write (Claude Code with Claude Sonnet 4.5, over MCP).
 * **Act only on what was measured.** Each produce gets only the capability validated for it, and every result states
   what was not inspected (the underside, a missing shelf-life number).
 * **A person where the camera cannot judge.** Questions carry the evidence and the measured reason, and are batched
