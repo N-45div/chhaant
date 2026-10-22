@@ -14,9 +14,9 @@ Live: <https://d1lk9oj2so3zh7.cloudfront.net> (AWS, Graviton4 with the Cloud-Opt
 
 | What | Result | Where |
 |---|---|---|
-| End to end: wrong items packed for a customer, 32 orders | 22 at the start, **0** after five measured iterations | §7.1 |
-| End to end: share of what the crate could have filled, packed correctly | 81% at the start, **96%** now | §7.1 |
-| Times a person is interrupted per order (the price of the safety) | 1.7 | §7.1 |
+| End to end: wrong items packed for a customer, 32 orders | 22 at the start, **0** after six measured iterations, with Claude Haiku 4.5 and with Amazon Nova 2 Lite | §7.1 |
+| End to end: share of what the crate could have filled, packed correctly | 81% at the start, **94%** now with either model | §7.1 |
+| Times a person is interrupted per order (the price of the safety) | 1.9 (Claude Haiku 4.5), 2.6 (Amazon Nova 2 Lite) | §7.1 |
 | The same 32 orders, driven over MCP by an agent I did not write (Claude Code, Claude Sonnet 4.5) | **0 wrong** in 65 packed, fill 94%; its runs exposed two gaps in my rules, both now fixed | §7.1 |
 | Rotate until sure vs looking at all 16 angles, 312 held-out sessions | **38 wrong calls vs 69**, with 3.95 views instead of 16 | §5.1 |
 | Avocado shelf life from two photos + temperature, 426 held-out fruit | mean error **1.05 days** (temperature alone: 3.45) | §5.2 |
@@ -69,8 +69,9 @@ The cell (top half of the diagram) runs once per order:
 ![Agent workflow: one order](agent_workflow.svg)
 
 The tools the model sees are `read_order`, `list_crate`, `inspect`, `look_closer`, `ask_person`, `place` and
-`finish` (`chhaant/agent/tools.py`). The agent is Claude Haiku 4.5 on Amazon Bedrock, through the Converse API, so
-any Bedrock model with tool use can take its place (the MCP evaluation in §7.1 drives the cell with Claude Sonnet 4.5).
+`finish` (`chhaant/agent/tools.py`). The agent runs on Amazon Bedrock through the Converse API. The live site offers
+two, both measured on the same 32 orders (§7.1): Amazon Nova 2 Lite, the default, and Claude Haiku 4.5. Any Bedrock
+model with tool use fits; the MCP evaluation drives the cell with Claude Sonnet 4.5.
 
 **Bring your own agent (MCP).** The same tools are also an MCP server (`chhaant/mcp_server.py`, `python -m
 chhaant.mcp_server`), so an agent in any MCP client can run the cell. The rules live in the cell, so that agent is
@@ -254,18 +255,18 @@ correctly (a bipartite matching of fit items to order slots).
 I used it as a loop: measure, explain every wrong pack from the trace (`eval/explain_wrong.py`), fix the cause, measure
 again.
 
-| Claude Haiku 4.5 (Bedrock) | baseline | iter 1 | iter 2 | iter 3 | iter 4 | iter 5 |
-|---|---|---|---|---|---|---|
-| packed wrong | 22 | 0 | 0 | 0 | 0 | 0 |
-| fill | 81% | 94% | 93% | 93% | 96% | 96% |
-| sound items thrown away | 1 | 3 | 0 | 0 | 0 | 0 |
-| times a person is interrupted per order | 1.0 | 3.8 | 2.9 | 2.9 | 1.8 | 1.7 |
-| orders read right | 24/32 | 32/32 | 32/32 | 32/32 | 32/32 | 32/32 |
-| "complete" claimed while a line is short | 4 | 0 | 0 | 0 | 0 | 0 |
-| median seconds / cost per order | 29 / $0.029 | 35 / $0.051 | 28 / $0.043 | 24 / $0.043 | 20 / $0.043 | 45* / $0.038 |
+| Claude Haiku 4.5 (Bedrock) | baseline | iter 1 | iter 2 | iter 3 | iter 4 | iter 5 | iter 6 |
+|---|---|---|---|---|---|---|---|
+| packed wrong | 22 | 0 | 0 | 0 | 0 | 0 | 0 |
+| fill | 81% | 94% | 93% | 93% | 96% | 96% | 94% |
+| sound items thrown away | 1 | 3 | 0 | 0 | 0 | 0 | 0 |
+| times a person is interrupted per order | 1.0 | 3.8 | 2.9 | 2.9 | 1.8 | 1.7 | 1.9 |
+| orders read right | 24/32 | 32/32 | 32/32 | 32/32 | 32/32 | 32/32 | 32/32 |
+| "complete" claimed while a line is short | 4 | 0 | 0 | 0 | 0 | 0 | 0 |
+| median seconds / cost per order | 29 / $0.029 | 35 / $0.051 | 28 / $0.043 | 24 / $0.043 | 20 / $0.043 | 45* / $0.038 | 39 / $0.044 |
 
 \* Iteration 5 ran while the MCP evaluation below was also using Bedrock; the time is mostly throttling back-off, and 2
-runs throttled out and were run again.
+runs throttled out and were run again. Times depend on Bedrock's load on the day.
 
 What each iteration changed, and the failure that drove it:
 
@@ -285,6 +286,28 @@ What each iteration changed, and the failure that drove it:
 * **Iteration 5.** A gap found by the outside agent below: marking an item down for sale today now needs its own
   question, and a yes to a general question permits no move. For Haiku nothing that counts changed (0 wrong, fill 96%,
   no sound item marked down early).
+* **Iteration 6.** A gap found by Amazon Nova 2 Lite (below): it read "one ripe avocado for today" as 1 day in all four
+  crates, and once that loosened the ripe-in-time check enough to pack an avocado that was 7 days from ripe. Timing
+  said in words now goes to the cell as words (today, tonight, tomorrow, a weekday), and the model gives a number only
+  for "in N days". Both models then read all 32 orders right.
+
+**Amazon's own models.** The same 32 orders with Amazon Nova on Bedrock, through the same backend (only the model id
+changes):
+
+| | Amazon Nova 2 Lite, iter 5 | Amazon Nova 2 Lite, iter 6 | Amazon Nova Pro, iter 5 | Claude Haiku 4.5, iter 6 |
+|---|---|---|---|---|
+| packed wrong | 1 | **0** | 0 | 0 |
+| fill | 93% | 94% | 84% | 94% |
+| times a person is interrupted per order | 2.0 | 2.6 | 2.5 | 1.9 |
+| moves the cell refused, per order | 0.3 | 0.5 | 4.6 | 0.5 |
+| orders read right | 28/32 | 32/32 | 17/32 | 32/32 |
+| runs that never finished | 0 | 0 | 3 | 0 |
+| median seconds / cost per order | 13 / $0.022 | **12 / $0.024** | 46 / $0.067 | 39 / $0.044 |
+
+Nova 2 Lite is as safe as Haiku on these orders, three times faster and about half the cost, and asks the person a
+little more often; it is the live site's default agent, with Haiku a click away. Nova Pro kept to the rules (0 wrong)
+but fought them, with 4.6 refused moves per order, misread half the orders and left 3 unfinished, so it is not
+offered. Nova prices are the AWS Price List API's for Mumbai.
 
 **With camera faults.** The same 32 orders with the live demo's faults switched on (a motion-blurred view on one
 tomato, glare at every angle on another, one avocado side cut off by the frame):
@@ -328,8 +351,8 @@ reproduced every tool result the agent saw.
 | median seconds / cost per order | 84 / $0.125 | 71 / $0.107 |
 
 The rules held for an agent I did not write. The person's time did not: this agent asks about one item at a time more
-often, and interrupts 2.8 times per order where Haiku interrupts 1.7. The safety comes from the cell; the cost in
-interruptions depends on the agent.
+often, and interrupts 2.8 times per order where Haiku, on the same rules, interrupts 1.7. The safety comes from the
+cell; the cost in interruptions depends on the agent.
 
 Its first run found two gaps in my rules that the built-in agents never hit:
 
