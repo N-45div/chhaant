@@ -130,16 +130,17 @@
   <text class="s" x="428" y="650">instance role: no keys on disk;</text>
   <text class="s" x="428" y="666">only CloudFront may reach port 8000</text>
 
-  <rect class="aws" x="790" y="540" width="180" height="50" rx="8"/>
+  <rect class="aws" x="790" y="540" width="180" height="62" rx="8"/>
   <text class="h" x="804" y="562">Amazon Bedrock</text>
-  <text class="s" x="804" y="580">Claude Haiku 4.5</text>
-  <rect class="aws" x="790" y="600" width="180" height="50" rx="8"/>
-  <text class="h" x="804" y="622">Amazon S3</text>
-  <text class="s" x="804" y="640">evidence per run; artifacts</text>
-  <rect class="aws" x="790" y="660" width="180" height="58" rx="8"/>
-  <text class="h" x="804" y="682">Amazon CloudWatch</text>
-  <text class="s" x="804" y="700">metrics, dashboard, alarms,</text>
-  <text class="s" x="804" y="713">instance auto-recovery</text>
+  <text class="s" x="804" y="579">Amazon Nova 2 Lite (live)</text>
+  <text class="s" x="804" y="594">or Claude Haiku 4.5</text>
+  <rect class="aws" x="790" y="612" width="180" height="50" rx="8"/>
+  <text class="h" x="804" y="634">Amazon S3</text>
+  <text class="s" x="804" y="652">evidence per run; artifacts</text>
+  <rect class="aws" x="790" y="672" width="180" height="58" rx="8"/>
+  <text class="h" x="804" y="694">Amazon CloudWatch</text>
+  <text class="s" x="804" y="712">metrics, dashboard, alarms,</text>
+  <text class="s" x="804" y="725">instance auto-recovery</text>
   <rect class="aws" x="1004" y="540" width="164" height="62" rx="8"/>
   <text class="h" x="1018" y="562">Systems Manager</text>
   <text class="s" x="1018" y="580">deploys, no SSH;</text>
@@ -158,8 +159,8 @@
   <path class="line" d="M174,581 L210,581"/>
   <path class="line" d="M374,581 L410,581"/>
   <path class="line" d="M744,565 L786,565"/>
-  <path class="line" d="M744,625 L786,625"/>
-  <path class="line" d="M744,665 L786,684"/>
+  <path class="line" d="M744,637 L786,637"/>
+  <path class="line" d="M744,665 L786,696"/>
   <path class="dash" d="M374,680 L410,680"/>
   <text class="lbl" x="378" y="698">model</text>
   <text class="lbl" x="34" y="770">All infrastructure is code in deploy/: CloudFormation stack, bootstrap script, systemd unit, evaluation and benchmark runners.</text>
