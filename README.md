@@ -174,8 +174,8 @@ bash deploy/deploy.sh              # first time: the S3 bucket, the artifacts an
 bash deploy/deploy.sh update       # later: ship the committed tree and restart, through Systems Manager
 ```
 
-It needs the AWS CLI signed in, a subscription to the COOL AMI on AWS Marketplace, and Bedrock access to Claude
-Haiku 4.5 in ap-south-1. The stack is one c8g.large with an Elastic IP, CloudFront, an S3 bucket for evidence, and a
+It needs the AWS CLI signed in, a subscription to the COOL AMI on AWS Marketplace, and Bedrock access to Amazon
+Nova 2 Lite (the live agent) in ap-south-1. The stack is one c8g.large with an Elastic IP, CloudFront, an S3 bucket for evidence, and a
 CloudWatch dashboard with alarms, for about $2 a day. [ARCHITECTURE.md](ARCHITECTURE.md#deployment-deploy) has the
 details.
 
